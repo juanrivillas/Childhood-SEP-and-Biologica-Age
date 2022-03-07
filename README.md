@@ -11,7 +11,7 @@ Code 2. Transformation data. This Markdown covers tidying data, data processing,
 
 Code 3. Data visualization and statistical testing. This Markdown covers basic statistics to summarise the data (Mean, Median, Mode, Outliers, errors), describe distribution and spreading of the data (plotting charts), measure the variability in the data (inter-quartile range, variance, SD, FWHM), quantify the strength of associations between variables (Pearson correlation coefficient), and asking questions about data (correlation matrices) and clustering.
 
-Code 4 BHS Calculation. The Markdown contains main working parts: calculate the relevant quartiles for the given combination of biomarkers and reference choice, get the score for each individual biomarker, and calculate the aggregated score by sub-systems (In this case only two: metabolic and cardio systems).
+Code 4 BHS Calculation. The Markdown contains main working parts: calculate the relevant quartiles for the given combination of biomarkers and reference choice, get the score for each individual biomarker, and calculate the aggregated score by sub-systems (In this case only two physiological systems: metabolic and cardiovascular).
 
 Code 5. Regression tables.
 
