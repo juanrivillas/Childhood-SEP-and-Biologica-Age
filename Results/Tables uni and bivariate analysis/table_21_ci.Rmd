@@ -1,0 +1,20 @@
+
+---
+  output: word_document
+---
+
+
+
+
+
+```{r, echo=FALSE}
+
+export2md(x, which.table=which.table, nmax=nmax, header.labels=header.labels, 
+caption=caption, format='markdown', strip=strip, 
+first.strip=first.strip, background=background, size=size, 
+header.background=header.background, header.color=header.color)
+
+```
+
+
+

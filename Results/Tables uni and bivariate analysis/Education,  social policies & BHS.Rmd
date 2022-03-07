@@ -1,0 +1,261 @@
+###########################################################################################################
+###  Research "Education, social policies, and biological aging in Colombia".                           ###
+###  Juan Rivillas-Garcia (j.rivillas-garcia20@imperial.ac.uk)                                          ###
+###                                                                                                     ###
+###  MRC and Molecular Signature and Disease Pathways Group                                             ###
+###                                                                                                     ###
+###  LAST UPDATE: 19/01/2022                                                                            ###
+###########################################################################################################
+
+***PAPER 2****
+---
+title: "Education, social policies & biological ageing COL"
+author: "Juan Rivillas"
+date: "20/01/2022"
+output: word_document
+---
+
+##Step 1. Preparing work space (data manipulation steps)
+
+Working directory
+
+```{r}
+setwd("/Users/macbookpro/Documents/PhD Project/Data/SABE")
+```
+
+Install CRAN packages and install the relevant libraries
+This code chunk shows the loading of packages required for the analyses.
+
+```{r}
+install.packages(c("dplyr", "tidyverse", "ggplot2", "hrbrthemes", "colorspace", "corrr","cowplot", "ggdark", "ggforce", "ggrepel","ggridges", "ggsci", "ggtext", "ggthemes", "grid", "gridExtra", "patchwork","rcartocolor", "scico", "showtext",   "shiny","plotly", "highcharter", "echarts4r", "colourlovers", "ggdist", "MetBrewer","vcdExtra","epiDisplay", "data.table", "formattable", "table1", "hexbin", "sjPlot", "haven", "devtools"))
+```
+
+Loading the relevant libraries into the work space
+
+```{r}
+library(tidyverse)  #Tidy data and transformation 
+library(epiDisplay) #to make frequency table in r (nicer version)
+library(DescTools)  #single and cumulative frequencies values are reported.
+library (MetBrewer) #retrieve palettes of colours 
+library(table1)     #to Create HTML Tables of Descriptive Statistics in epi
+library(hrbrthemes) #improved histograms
+library("ggplot2")  #improved plots and bar charts
+library(colourlovers) #Retrieve color palette or palettes
+library(hexbin)     #Plots biomarkers
+library (sjPlot)    #Data Visualization for Statistics in Social Science
+library(haven)
+library(devtools)
+```
+
+Retrieve palettes using various methods listed below. 
+
+```{r}
+install.packages("devtools") 
+devtools::install_github("BlakeRMills/MetBrewer") 
+
+met.brewer("Hiroshige")
+
+["Hiroshige",["#aadce0","#ef8a47","#376795","#f7aa58","#72bcd5","#ffe6b7","#e76254","#1e466e","#ffd06f","#528fad"]]
+```
+
+
+Assign file pathway to save automatically plots and outcomes in pdf format
+
+```{r}
+setwd("/Users/macbookpro/Documents/PhD Project/Analysis/plots")
+```
+
+
+
+Loading data (EXCEL files)
+
+```{r}
+library(readxl)
+SABE_Colombia <- read_excel("~/Documents/PhD Project/Data/SABE/SABE_Colombia.xlsx")
+```
+
+
+## Step 2. subset rows on conditions and filter BIOMARKER ==1 (Selection of 4,092 observations)
+
+```{r}
+newdata <- SABE_Colombia[ which(SABE_Colombia$biomarkers=='1'), ]
+View(newdata)
+```
+
+Subset columns (selection of 60 variables present in the data).
+
+```{r}
+myvars <- c("current_sep", "health_insurance", "educational_level", "sep_occupation", "family_sep","area_residence",
+"neglected_food", "household_violence", "migration", "migration_yo","emotional_abuse","poor_health1","poor_health2",
+"early_infection1","early_infection2","early_infection3","early_infection4","early_infection5","early_infection6","early_infection7",
+"hdl", "ldl", "total_cholesterol", "triglycerides", "glucose", "glycated_haemoglobin", "weight", "height", "wc",
+"systolic_bprh","dyastolic_bprh","systolic_bplh", "dyastolic_bplh","pulse_rh","pulse_lh",
+"hta", "diabetes", "cvd", "mhdisorder","medication","P835","P835_1","P835_2","P835_3","P835_4","P835_5","P835_6","P835_7","P835_8","P835_9","P835_10","P835_11","P835_12","age", "sex", "ethnic_group", "alcohol", "smoking","cash_transfer1", "cash_transfer2")
+```
+
+Verifying upload and exploring individual SEP and biomarkers data.
+
+```{r}
+biomarkers <- newdata[myvars]
+biomarkers
+```
+
+
+******
+
+education ten categories were regrouped into three main categories:
+
+-Low
+-Intermediate
+-High
+
+```{r education}
+
+biomarkers$educational_level <- factor(biomarkers$educational_level,
+                levels = c("1","2","3","4","5","6","7","8","9","10","11","98","99"),
+                labels = c("low", "low","low","intermediate","intermediate",
+                "high","high","high","high","high","high","Not reply/Don't know","Not reply/Don't know"))
+
+Desc(biomarkers$educational_level)
+Freq(biomarkers$educational_level)
+```
+
+#Social protection data
+
+health insurance regrouped into three main groups
+```{r health coverage}
+
+biomarkers$health_insurance <- factor(biomarkers$health_insurance,
+                levels = c("1","2","3","4","5","8","9"),
+                labels = c("insured", "subsidised","insured","insured","uninsured","uninsured","uninsured"))
+
+#Missing values: 2 (no replied)
+Desc(biomarkers$health_insurance)
+Freq(biomarkers$health_insurance)
+
+```
+
+
+social cash transfers 
+```{r social policies}
+
+biomarkers$social.cash.transfer <- factor(biomarkers$cash_transfer2,
+                levels = c("1","2","8","9"),
+                labels = c("Yes","Not","Not reply/Don't know", "Not reply/Don't know"))
+
+#compute frequency tables
+Desc(biomarkers$social.cash.transfer)
+Freq(biomarkers$social.cash.transfer)
+
+```
+
+elderly nutrition program
+```{r} 
+biomarkers$nutrition_program <- factor(biomarkers$cash_transfer1,
+                levels = c("1","2","8","9"),
+                labels = c("Yes","Not","Not reply/Don't know", "Not reply/Don't know"))
+
+#compute frequency tables
+Desc(biomarkers$nutrition_program)
+Freq(biomarkers$nutrition_program)
+
+```
+
+
+
+```{r}
+biomarkers$health_insurance <- factor(biomarkers$health_insurance)
+
+biomarkers$social.cash.transfer <- factor(biomarkers$cash_transfer2,
+                levels = c("1","2","8","9"),
+                labels = c("Yes","Not","Not reply/Don't know", "Not reply/Don't know"))
+
+biomarkers$nutrition_program <- factor(biomarkers$cash_transfer1,
+                levels = c("1","2","8","9"),
+                labels = c("Yes","Not","Not reply/Don't know", "Not reply/Don't know"))
+
+table1(~health_insurance + social.cash.transfer + nutrition_program | sex + age_group, data=biomarkers)
+```
+
+
+Education by ethnicity
+
+```{r}
+table1(~sex + age_group + family_sep + current_sep + educational_level + sep_occupation + health_insurance + acesum + social.cash.transfer | ethnic_group, data=biomarkers)
+```
+
+
+social policies by demographics characteristics (sex and age groups)
+
+```{r table social policies} 
+table1(~health_insurance + social.cash.transfer + nutrition_program | sex + age_group, data=biomarkers)
+```
+
+Baseline characteristics by education
+
+```{r table SEP by education}
+
+table1(~ sex + age_group + family_sep + current_sep +  + sep_occupation + acesum + health_insurance + social.cash.transfer | educational_level, data=biomarkers)
+```
+
+Baseline characteristics by sex and age
+
+```{r table SEP measures}
+
+table1(~family_sep + current_sep + sep_occupation + acesum + health_insurance + social.cash.transfer | sex + age_group, data=biomarkers)
+```
+
+Baseline characteristics by social policies
+
+```{r table SEP by ACEs}
+
+table1(~ sex + age_group + family_sep + current_sep + educational_level + sep_occupation +health_insurance + social.cash.transfer | acesum, data=biomarkers)
+```
+
+
+Table description of population study by education
+
+```{r}
+table1(~sex + age_group + area_residence + ethnic_group + health_insurance + social.cash.transfer + comorbidities + medicationsum + smoking + alcohol + bmi_cat + high.waist.circumference.male + high.waist.circumference.female | educational_level, data=biomarkers, #show.ci = TRUE)
+```
+
+#Plotting
+
+
+```{r}
+biomarkers %>%                            # begin with dataframe
+  count(sex, educational_level) %>%     # group and tabulate counts by two columns
+  ggplot()+                               # pass new data frame to ggplot
+    geom_col(                             # create bar plot
+      mapping = aes(   
+        x = educational_level,                # map outcome to x-axis
+        fill = sex,                 # map age to the fill
+        y = n))                           # map the counts column `n` to the height
+```
+
+
+
+```{r}
+biomarkers %>%                            # begin with dataframe
+  count(sex, social.cash.transfer) %>%     # group and tabulate counts by two columns
+  ggplot()+                               # pass new data frame to ggplot
+    geom_col(                             # create bar plot
+      mapping = aes(   
+        x = social.cash.transfer,                # map outcome to x-axis
+        fill = sex,                 # map age to the fill
+        y = n))                           # map the counts column `n` to the height
+```
+
+```{r}
+biomarkers %>%                            # begin with dataframe
+  count(age_group, social.cash.transfer) %>%     # group and tabulate counts by two columns
+  ggplot()+                               # pass new data frame to ggplot
+    geom_col(                             # create bar plot
+      mapping = aes(   
+        x = social.cash.transfer,                # map outcome to x-axis
+        fill = age_group,                 # map age to the fill
+        y = n))                           # map the counts column `n` to the height
+```
+
+
+
