@@ -1,0 +1,654 @@
+---
+title: "gbmt"
+author: "Juan Rivillas"
+date: "08/04/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+Data Preparation
+To perform a cluster analysis in R, generally, the data should be prepared as follows:
+
+Rows are observations (individuals) and columns are variables
+Any missing value in the data must be removed or estimated.
+The data must be standardized (i.e., scaled) to make variables comparable. Recall that, standardization consists of transforming the variables such that they have mean zero and standard deviation one.
+
+Step a: Data preparation
+1.2. Importing of new data base (Loading data EXCEL files)**.
+
+```{r}
+library(readxl)
+dfaces <- read_excel("~/Documents/PhD Project/Data/SABE/Dataframes/dfaces.xlsx")
+View(dfaces)
+```
+
+Load the following packages:
+
+```{r}
+install.packages("factoextra")
+install.packages("Matrix")    ## Matrix: Sparse and Dense Matrix Classes and Methods
+install.packages("ggplot2")
+install.packages('dendextend') #Extending R’s dendrogram functionality
+install.packages('ape')
+
+library("ggplot2")  #improved plots and bar charts
+library(dplyr)    
+library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering algorithms & visualization
+library(GGally)
+library(plotly)
+library(table1)     #to Create HTML Tables of Descriptive Statistics in epi
+library(dendextend)
+# load package ape; remember to install it: install.packages('ape')
+library(ape)
+library("ggplot2")  #improved plots and bar charts
+
+```
+
+SABE submsample (n=4,092)
+
+check NA values in dataset
+```{r}
+skimr::skim(dfaces)
+```
+
+#k-means clustering (number of class is fixed)
+This is a supervised technique.
+
+Cluster Analysis in R
+The kmeans function also has a nstart option that attempts multiple initial configurations and reports on the best output. For example, adding nstart = 25 will generate 25 initial configurations. This approach is often recommended.
+
+```{r}
+library(factoextra) 
+k2 <- kmeans(nor, centers = 3, nstart = 25)
+k2
+```
+
+
+Scree Plot
+Scree plot will allow us to see the variabilities in clusters, suppose if we increase the number of clusters within-group sum of squares will come down.
+
+So in this data ideal number of clusters should be 3, 4, or 5.
+
+```{r}
+wss <- (nrow(nor)-1)*sum(apply(nor,2,var))
+for (i in 2:20) wss[i] <- sum(kmeans(nor, centers=i)$withinss)
+plot(1:20, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+```
+
+
+
+
+
+
+#Optimal number of clusters
+
+We can find out optimal clusters in R with the following code. The results suggest that 3 is the optimal number of clusters as it appears to be the bend in the knee.
+
+Elbow method
+The Elbow method looks at the total within-cluster sum of square (WSS) as a function of the number of clusters.
+
+```{r}
+fviz_nbclust(nor, kmeans, method = "wss")
+```
+
+
+#Average Silhouette Method
+The average silhouette approach measures the quality of a clustering. It determines how well each observation lies within its cluster.
+
+A high average silhouette width indicates a good clustering. The average silhouette method computes the average silhouette of observations for different values of k.
+
+In this method also optimal number of cluster is 4.
+
+```{r}
+fviz_nbclust(nor, kmeans, method = "silhouette")
+```
+
+
+# compute gap statistic
+To compute the gap statistic method we can use the clusGap function which provides the gap statistic and standard error for an output.
+
+Gap Statistic Method
+This approach can be utilized in any type of clustering method (i.e. K-means clustering, hierarchical clustering).
+
+The gap statistic compares the total intracluster variation for different values of k with their expected values under null reference distribution of the data.
+
+
+```{r}
+gap_stat <- clusGap(nor, FUN = kmeans, nstart = 25,
+                    K.max = 10, B = 50)
+fviz_gap_stat(gap_stat)
+gap_stat
+```
+
+
+Clustering Validation: Average Silhouette Method
+
+We use the silhouette coefficient (silhouette width) to evaluate the goodness of our clustering.
+So, the interpretation of the silhouette width is the following:
+
+Si > 0 means that the observation is well clustered. The closest it is to 1, the best it is clustered.
+Si < 0 means that the observation was placed in the wrong cluster.
+Si = 0 means that the observation is between two clusters.
+
+The silhouette plot below gives us evidence that our clustering using five groups is good because there’s no negative silhouette width and most of the values are bigger than 0.5.
+
+In short, the average silhouette approach measures the quality of a clustering. That is, it determines how well each object lies within its cluster. A high average silhouette width indicates a good clustering. The average silhouette method computes the average silhouette of observations for different values of k. The optimal number of clusters k is the one that maximizes the average silhouette over a range of possible values for k.2
+
+```{r}
+library(cluster)
+sil <- silhouette(km$cluster, dist(dfaces))
+fviz_silhouette(sil)
+```
+
+Extracting Results
+With most of these approaches suggesting 4 as the number of optimal clusters, we can perform the final analysis and extract the results using 8 clusters.
+
+# Compute k-means clustering with k = 4
+```{r}
+set.seed(123)
+final <- kmeans(dfaces, 4, nstart = 25)
+print(final)
+```
+
+We can visualize the results using fviz_cluster:
+
+```{r}
+fviz_cluster(final, data = dfaces, ellipse.type = "norm")
+```
+HERE
+
+
+
+
+
+
+
+
+```{r}
+library(parameters)
+install.packages('NbClust')
+install.packages('mclust')
+install.packages('see')
+
+n_clust <- n_clusters(dfaces,
+                      package = c("easystats", "NbClust", "mclust"),
+                      standardize = FALSE)
+n_clust
+
+plot(n_clust)
+```
+
+
+
+
+If there are more than two dimensions (variables) fviz_cluster will perform principal component analysis (PCA) and plot the data points according to the first two principal components that explain the majority of the variance.
+
+```{r}
+str(k2)
+fviz_cluster(k2, data = nor)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+Normalization
+```{r}
+z <- dfaces[,-c(1,1)]
+means <- apply(z,2,mean)
+sds <- apply(z,2,sd)
+nor <- scale(z,center=means,scale=sds)
+```
+
+Calculate distance matrix
+```{r}
+distance = dist(nor)
+```
+
+
+
+
+#Hierarchical agglomerative clustering 
+```{r}
+mydata.hclust = hclust(distance)
+plot(mydata.hclust)
+plot(mydata.hclust,labels=dfaces$neglected_food,main='Default from hclust', ylab = "Height", nodePar = nodePar, leaflab = "none")
+plot(mydata.hclust,hang=-1, labels=dfaces$neglected_food,main='Default from hclust')
+
+distxy <- dist(mydata.hclust)
+```
+
+# Define nodePar
+nodePar <- list(lab.cex = 0.6, pch = c(NA, 19), 
+                cex = 0.7, col = "blue")
+
+pdf(file="dendrogram.pdf", height=10, width=30)
+plot(mydata.hclust, edge.root=TRUE, horiz=TRUE)
+dev.off()
+
+
+# vector of colors labelColors = c('red', 'blue', 'darkgreen', 'darkgrey',
+# 'purple')
+labelColors = c("#CDB380", "#036564", "#EB6841", "#EDC951")
+# cut dendrogram in 4 clusters
+clusMember = cutree(mydata.hclust, 6)
+# function to get color labels
+colLab <- function(n) {
+    if (is.leaf(n)) {
+        a <- attributes(n)
+        labCol <- labelColors[clusMember[which(names(clusMember) == a$label)]]
+        attr(n, "nodePar") <- c(a$nodePar, lab.col = labCol)
+    }
+    n
+}
+# using dendrapply
+clusDendro = dendrapply(mydata.hclust)
+# make plot
+plot(clusDendro, main = "Cool Dendrogram", type = "triangle")
+
+
+
+
+
+
+```{r}
+
+plot(mydata.hclust, ylab = "Height", xlab="Distance", xlim=c(1,10), ylim=c(1,10))
+
+
+
+plot(mydata.hclust, hang = -1, cex = 0.6, xlim = c(1, 8), ylim = c(1,20))
+
+plot(as.phylo(mydata.hclust), cex = 0.9, xlim = c(1, 8), ylim = c(1,20), label.offset = 1, lab = "Height", nodePar = nodePar, 
+     edgePar = list(col = 2:3, lwd = 2:1))
+
+
+plot(as.phylo(mydata.hclust), type = "cladogram", cex = 0.9, label.offset = 1)
+
+summary(mydata.hclust)
+```
+
+
+
+
+labels(mydata.hclust) <- c("neglected_food", "household_violence", "emotional_abuse", "poor_health2", "early_infection", "migration_yo")
+plot(mydata.hclust, main = "dend with edited labels")
+
+
+
+Hierarchical agglomerative clustering using “average” linkage
+
+```{r}
+mydata.hclust<-hclust(distance,method="average") 
+plot(mydata.hclust,hang=-1, xlab = "Height",
+     nodePar = nodePar, horiz = TRUE) 
+mydata.hclust
+
+```
+
+```{r}
+seeds_df_sc <- as.data.frame(scale(dfaces))
+summary(seeds_df_sc)
+dist_mat <- dist(seeds_df_sc, method = 'euclidean')
+hclust_avg <- hclust(dist_mat, method = 'average')
+plot(hclust_avg)
+
+cut_avg <- cutree(hclust_avg, k = 2)
+plot(hclust_avg)
+rect.hclust(hclust_avg , k = 2, border = 2:6)
+abline(h = 3, col = 'red')
+
+#Now you can see the three clusters enclosed in three different colored boxes.
+#suppressPackageStartupMessages(library(dendextend))
+avg_dend_obj <- as.dendrogram(hclust_avg)
+avg_col_dend <- color_branches(avg_dend_obj, h = 3)
+plot(avg_col_dend)
+```
+
+
+Now you will append the cluster results obtained back in the original dataframe under column name the cluster with mutate(), from the dplyr package and count how many observations were assigned to each cluster with the count() function. You will be able to see how many observations were assigned in each cluster. Note that in reality from the labeled data you had 70 observations for each variety of wheat.
+```{r}
+#suppressPackageStartupMessages(library(dplyr))
+seeds_df_cl <- mutate(dfaces, cluster = cut_avg)
+count(seeds_df_cl,cluster)
+View(seeds_df_cl)
+```
+
+```{r}
+table(seeds_df_cl$cluster)
+```
+
+
+```{r}
+install.packages("ggbiplot")
+library(ggbiplot)
+install_github("vqv/ggbiplot")
+ggbiplot(mtcars.pca)
+```
+
+
+
+Cluster membership
+```{r}
+member = cutree(mydata.hclust, k=3)
+table(member)
+member
+```
+
+Characterizing clusters
+
+```{r}
+aggregate(nor,list(member),mean)
+aggregate(dfaces[,-c(1,1)],list(member),mean)
+```
+
+```{r}
+library(cluster)
+plot(silhouette(cutree(mydata.hclust,2), distance))
+```
+
+
+```{r}
+plot(summary(res_kmeans))
+
+```
+
+
+
+K-means clustering
+```{r}
+set.seed(123)
+kc<-kmeans(nor,2)
+kc
+
+ot<-nor
+datadistshortset<-dist(ot,method = "euclidean")
+hc1 <- hclust(datadistshortset, method = "complete" )
+pamvshortset <- pam(datadistshortset,4, diss = FALSE)
+clusplot(pamvshortset, shade = FALSE,labels=2,col.clus="blue",col.p="red",span=FALSE,main="Cluster Mapping",cex=1.2)
+```
+
+
+
+
+
+
+
+
+
+CLustering final
+
+```{r}
+km <- kmeans(dfaces, centers = 3)
+km
+```
+
+
+
+And we can extract the clusters and add to our initial data to do some descriptive statistics at the cluster level:
+
+```{r}
+dfaces %>%
+  mutate(Cluster = final$cluster) %>%
+  group_by(Cluster) %>%
+  summarise_all("mean")
+```
+
+#find means of each cluster
+```{r}
+aggregate(dfaces, by=list(cluster=km$cluster), mean)
+```
+
+We interpret this output is as follows:
+  1    2    3    4    5    6 
+ 
+We need to examine the clusters and determine a sensible way to interpret them. This boils down to summarizing the samples within each cluster, or characterizing the clusters. Fortunately, we can use some tools to help us.
+
+
+```{r}
+mytable <- table(km$cluster)
+mytable
+```
+
+dfaces$cluster <- km$cluster
+View(dfaces)
+
+Save data in a separated dataframe to merge with subsample biomarkers
+```{r }
+writexl::write_xlsx( x = dfaces, path =  '/Users/macbookpro/Documents/PhD Project/Data/SABE/dataframes/dfcluster.xlsx' )
+```
+
+
+
+***Approach two: to conduct Latent Class Analysis (LCA) in R with poLCA package***
+
+I have six variables: neglected food, household violence, migration, emotional abuse, early-life infection, and poor health reported at 15 years old. An, I am going to clasify my participants based on the foregoing criteria. 
+
+Outputs:
+Table 1. Sample Characteristics of older people (Aged 60 Years and more) in Colombia, 2015 (N = 4,092).
+Table 2. Evaluating Class Solutions.
+
+Install and load poLCA package
+install.packages ("poLCA")
+library (poLCA)
+library(readxl)
+
+
+Using SABE subsample biomarkers (n=4,092)
+
+Load data and have a loot at the original data in Excel. Recommendation: load data as .txt file to facilitate poLCA to process data easily.
+
+
+```{r}
+dfsabe1 <- read.delim (file.choose (), header = TRUE)
+View(dfsabe1)
+```
+
+
+```{r}
+
+dfsabe1$poor_health2 <- factor(dfsabe1$poor_health2)
+dfsabe1$neglected_food <- factor(dfsabe1$neglected_food)
+dfsabe1$emotional_abuse <- factor(dfsabe1$emotional_abuse)
+dfsabe1$migration_yo2 <- factor(dfsabe1$migration_yo2)
+dfsabe1$household_violence <- factor(dfsabe1$household_violence)
+dfsabe1$early_infection <- factor(dfsabe1$early_infection)
+
+Desc(dfsabe1$migration)
+Desc(dfsabe1$emotional_abuse)
+Desc(dfsabe1$migration)
+Desc(dfsabe1$neglected_food)
+Freq(dfsabe1$neglected_food)
+```
+
+
+Define our LCA model with original data base.
+It is straightforward to replicate using the series of commands:
+```{r}
+f  <- cbind (neglected_food, household_violence, poor_health2, emotional_abuse, migration_yo2, early_infection) ~ 1
+M1 <- poLCA(f, data = dfsabe1, nclass = 2, graphs = TRUE, na.rm = TRUE)
+M2 <- poLCA(f, data = dfsabe1, nclass = 3, graphs = TRUE, na.rm = TRUE)
+M3 <- poLCA(f, data = dfsabe1, nclass = 4, graphs = TRUE, na.rm = TRUE)
+M4 <- poLCA(f, data = dfsabe1, nclass = 5, graphs = TRUE, na.rm = TRUE)
+M5 <- poLCA(f, data = dfsabe1, nclass = 6, graphs = TRUE, na.rm = TRUE)
+
+
+```
+
+# Validation: Entropy of fitted latent class models
+```{r}
+nume.E <- -sum(M1$posterior * log(M1$posterior))
+##Denominator (n*log(K)): ## n is a sample size, and K is a number of class
+deno.E <- 4092*log(2)
+##Relative Entropy
+Entro <- 1-(nume.E/deno.E)
+Entro
+```
+
+
+
+```{r}
+POST = round(M1$posterior,2)
+rownames(POST) = rownames(M1$y)
+
+# we can check that the rownames of posterior values are indeed those complete values in original data
+table(rownames(dfsabe1)[complete.cases(dfsabe1)] == rownames(POST))
+View(M1$y)
+```
+
+Generate table showing fitvalues of multiple models
+Now we build a table for comparison of various model-fit values like this:
+
+
+
+#Save data base.
+writexl::write_xlsx( x = dfsabe1, path =  '/Users/macbookpro/Documents/PhD Project/Data/SABE/dataframes/dfsabe1.xlsx' )
+
+
+
+
+
+
+**** Annotations vector transformation****
+Coding ACE data:
+0: No
+1: Yes
+
+```{r}
+
+dfaces1$poor_health2 <- factor(dfaces1$poor_health2)
+dfaces1$neglected_food <- factor(dfaces1$neglected_food)
+dfaces1$emotional_abuse <- factor(dfaces1$emotional_abuse)
+dfaces1$migration_yo2 <- factor(dfaces1$migration_yo2)
+dfaces1$household_violence <- factor(dfaces1$household_violence)
+dfaces1$early_infection <- factor(dfaces1$early_infection)
+
+Desc(dfaces1$emotional_abuse)
+Desc(dfaces1$migration)
+Desc(dfaces1$early_infection)
+Freq(dfaces1$early_infection)
+Desc(dfaces1$neglected_food)
+Freq(dfaces1$neglected_food, useNA = "always")
+Desc(dfaces1$neglected_food)
+Freq(dfaces1$neglected_food, useNA = "always")
+```
+
+```
+
+Using Original database (n=23,694 individuals)
+
+Load data and have a loot at the original data in Excel. Recommendation: load data as .txt file to facilitate poLCA to process data easily.
+
+```{r}
+#dfaces <- read_excel("/Users/macbookpro/Documents/PhD Project/Data/SABE/Dataframes/dfaces.xlsx")
+#skimr::skim(dfaces)
+
+dforiginal <- read.delim (file.choose (), header = TRUE)
+View(dforiginal)
+```
+
+
+```{r }
+dforiginal$poor_health2 <- factor(dforiginal$poor_health2,
+                levels = c("1","2","8","9"),
+                labels = c("1","0","0","0"))
+
+dforiginal$emotional_abuse <- factor(dforiginal$emotional_abuse,
+                levels = c("1","2","3","4","8","9"),
+                labels = c("1","1","1","0","0","0"))
+
+dforiginal$migration <- factor(tdforiginal$migration,
+                levels = c("1","2","8","9"),
+                labels = c(""1","0","0","0"))
+
+dforiginal$neglected_food <- factor(dforiginal$neglected_food,
+                levels = c("1","2","8","9"),
+                labels = c("1","0", "0","0"))
+
+dforiginal$household_violence <- factor(dforiginal$household_violence,
+                levels = c("1","2","8","9"),
+                labels = c("1","0", "0","0"))
+```
+
+
+Define our LCA model with original data base.
+```{r}
+f  <- cbind (neglected_food, household_violence, poor_health2, emotional_abuse, migration) ~ 1
+M1 <- poLCA(f, data = dforiginal, nclass = 2, graphs = TRUE, na.rm = TRUE)
+M2 <- poLCA(f, data = dforiginal, nclass = 3, graphs = TRUE, na.rm = TRUE)
+M3 <- poLCA(f, data = dforiginal, nclass = 4, graphs = TRUE, na.rm = TRUE)
+M4 <- poLCA(f, data = dforiginal, nclass = 5, graphs = TRUE, na.rm = TRUE)
+M5 <- poLCA(f, data = dforiginal, nclass = 6, graphs = TRUE, na.rm = TRUE)
+
+```
+
+
+# Validation: Entropy of fitted latent class models
+```{r}
+nume.E <- -sum(M4$posterior * log(M4$posterior))
+##Denominator (n*log(K)): ## n is a sample size, and K is a number of class
+deno.E <- 19004*log(5)
+##Relative Entropy
+Entro <- 1-(nume.E/deno.E)
+Entro
+```
+
+
+# Entropy of fitted latent class models
+poLCA.entropy(M1)
+poLCA.entropy(lca3)
+poLCA.entropy(lca4)
+
+
+```{r}
+dforiginal$poor_health2      <- factor(dforiginal$poor_health2)
+dforiginal$neglected_food    <- factor(dforiginal$neglected_food)
+dforiginal$emotional_abuse   <- factor(dforiginal1$emotional_abuse)
+dforiginal$migration         <- factor(dforiginal$migration)
+dforiginal$household_violence <- factor(dforiginal$household_violence)
+```
+
+
+
+Define our LCA model.
+We do not know which model or how many classes are aprropriate for the data yet. The first step, is to try out different models and then compare them.
+
+```{r}
+f  <- cbind (neglected_food, household_violence, poor_health2, emotional_abuse, early_infection, migration_yo2) ~ 1
+M1 <- poLCA(f, data = dfaces1, nclass = 2, graphs = TRUE, na.rm = TRUE)
+M2 <- poLCA(f, data = dfaces1, nclass = 3, graphs = TRUE, na.rm = TRUE)
+M3 <- poLCA(f, data = dfaces1, nclass = 4, graphs = TRUE, na.rm = TRUE)
+M4 <- poLCA(f, data = dfaces1, nclass = 5, graphs = TRUE, na.rm = TRUE)
+```
+
+We will preffer the lower value for BIC as the better model.
+So based on the BIC value, we chood Model 1 with lower BIC indicating better model fit (Nylund et al., 2007) and with two latent groups for our data.
+
+By observing the graph, we can see that participants in the group 1 (76%), have a higher level of adversities in the childhood (High adversity group).
+
+In contrants, participants in the group 2 (24% of the subsample)  reported less adversities in childhood (Lowe adversity group), early-life infection is more likely to be lower.
+
+
+```{r}
+SABE_Colombia <- read_excel("~/Documents/PhD Project/Data/SABE/Dataframes/SABE_Colombia.xlsx")
+
+myvars <- c("neglected_food","household_violence","emotional_abuse","poor_health2", "migration")
+dfsabe1 <- SABE_Colombia[myvars]
+View(dfsabe1)
+
+
