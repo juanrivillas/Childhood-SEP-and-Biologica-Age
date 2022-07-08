@@ -1,17 +1,25 @@
 ---
-title: "gbmt"
+title: "Latent high-risk adversity groups"
 author: "Juan Rivillas"
 date: "08/04/2022"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+This code includes:Clustering analysis and Latent Class Analysis (LCA)
 
-## R Markdown
+I implemented two different approaches for identifying the best fit model and classification of high-risk adversity groups. 
 
-Data Preparation
+1.	Differentiation. To describe and differentiate between six different ACEs at 15 years old.
+2.	Model comparison. To investigate differences between two conceptual models of the effects of ACEs on adult health, contrasting the cluster analysis (computing k-means clustering) with Latent Class Analysis (LCA) to identify the best fit model and classification of adversity groups during childhood.
+•	Clustering analysis.
+•	Identify Latent Profiles of ACEs.
+•	Investigate differences that arise from the use of different approaches.
+•	To examine several diagnostic criteria to select a final model.
+•	To capture the clustering or class of multiple stressors in groups.
+3.	To identify relationships of these childhood experiences to cause-specific disease in adult life (trajectories in cardiometabolic conditions at 60 years old).
+
+
+#Data Preparation
 To perform a cluster analysis in R, generally, the data should be prepared as follows:
 
 Rows are observations (individuals) and columns are variables
@@ -28,7 +36,6 @@ View(dfaces)
 ```
 
 Load the following packages:
-
 ```{r}
 install.packages("factoextra")
 install.packages("Matrix")    ## Matrix: Sparse and Dense Matrix Classes and Methods
@@ -37,6 +44,7 @@ install.packages('dendextend') #Extending R’s dendrogram functionality
 install.packages('ape')
 
 library("ggplot2")  #improved plots and bar charts
+library(DescTools)  #single and cumulative frequencies values are reported.
 library(dplyr)    
 library(tidyverse)  # data manipulation
 library(cluster)    # clustering algorithms
@@ -48,7 +56,6 @@ library(dendextend)
 # load package ape; remember to install it: install.packages('ape')
 library(ape)
 library("ggplot2")  #improved plots and bar charts
-
 ```
 
 SABE submsample (n=4,092)
@@ -83,12 +90,7 @@ plot(1:20, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of 
 ```
 
 
-
-
-
-
 #Optimal number of clusters
-
 We can find out optimal clusters in R with the following code. The results suggest that 3 is the optimal number of clusters as it appears to be the bend in the knee.
 
 Elbow method
@@ -440,7 +442,7 @@ writexl::write_xlsx( x = dfaces, path =  '/Users/macbookpro/Documents/PhD Projec
 I have six variables: neglected food, household violence, migration, emotional abuse, early-life infection, and poor health reported at 15 years old. An, I am going to clasify my participants based on the foregoing criteria. 
 
 Outputs:
-Table 1. Sample Characteristics of older people (Aged 60 Years and more) in Colombia, 2015 (N = 4,092).
+Table 1. Sample Characteristics of older people (Aged 60 Years and more) in Colombia, 2015 (N = 2,812).
 Table 2. Evaluating Class Solutions.
 
 Install and load poLCA package
@@ -448,12 +450,11 @@ install.packages ("poLCA")
 library (poLCA)
 library(readxl)
 
+#####LCA with dataset n=2,812####
 
-Using SABE subsample biomarkers (n=4,092)
+Using SABE subsample biomarkers (n=2,812)
 
 Load data and have a loot at the original data in Excel. Recommendation: load data as .txt file to facilitate poLCA to process data easily.
-
-
 ```{r}
 dfsabe1 <- read.delim (file.choose (), header = TRUE)
 View(dfsabe1)
@@ -462,12 +463,13 @@ View(dfsabe1)
 
 ```{r}
 
-dfsabe1$poor_health2 <- factor(dfsabe1$poor_health2)
-dfsabe1$neglected_food <- factor(dfsabe1$neglected_food)
-dfsabe1$emotional_abuse <- factor(dfsabe1$emotional_abuse)
-dfsabe1$migration_yo2 <- factor(dfsabe1$migration_yo2)
-dfsabe1$household_violence <- factor(dfsabe1$household_violence)
-dfsabe1$early_infection <- factor(dfsabe1$early_infection)
+dfcase_complete$poor_health2   <- factor(dfcase_complete$poor_health2)
+dfcase_complete$neglected_food <- factor(dfcase_complete$neglected_food)
+dfcase_complete$emotional_abuse <- factor(dfcase_complete$emotional_abuse)
+dfcase_complete$migration_yo   <- factor(dfcase_complete$migration_yo)
+dfcase_complete$household_violence <- factor(dfcase_complete$household_violence)
+dfcase_complete$early_infection <- factor(dfcase_complete$early_infection)
+dfcase_complete$sex <- factor(dfcase_complete$sex)
 
 Desc(dfsabe1$migration)
 Desc(dfsabe1$emotional_abuse)
@@ -476,52 +478,479 @@ Desc(dfsabe1$neglected_food)
 Freq(dfsabe1$neglected_food)
 ```
 
+Check order levels to avoid confussions in the interpretation assigning groups
+```{r}
+levels(dfcase_complete$emotional_abuse)
+levels(dfcase_complete$neglected_food)
+levels(dfcase_complete$poor_health2)
+levels(dfcase_complete$early_infection)
+levels(dfcase_complete$household_violence)
+levels(dfcase_complete$migration_yo)
+```
+
 
 Define our LCA model with original data base.
-It is straightforward to replicate using the series of commands:
 ```{r}
-f  <- cbind (neglected_food, household_violence, poor_health2, emotional_abuse, migration_yo2, early_infection) ~ 1
-M1 <- poLCA(f, data = dfsabe1, nclass = 2, graphs = TRUE, na.rm = TRUE)
-M2 <- poLCA(f, data = dfsabe1, nclass = 3, graphs = TRUE, na.rm = TRUE)
-M3 <- poLCA(f, data = dfsabe1, nclass = 4, graphs = TRUE, na.rm = TRUE)
-M4 <- poLCA(f, data = dfsabe1, nclass = 5, graphs = TRUE, na.rm = TRUE)
-M5 <- poLCA(f, data = dfsabe1, nclass = 6, graphs = TRUE, na.rm = TRUE)
+f  <- cbind (neglected_food, household_violence, poor_health2, emotional_abuse, migration_yo, early_infection) ~ 1
 
+#estimate the model with k-classes to identify the appropriate number of classes
+The following code stems from this article. It runs a sequence of models with two to ten groups.
 
+M1 <- poLCA(f, data = dfcase_complete, nclass = 2, graphs = TRUE, na.rm = TRUE)
+#We have 2 classess and probability for each class or characteristics of the participants classified as class 1 and 2.
+
+M2 <- poLCA(f, data = dfcase_complete, nclass = 3, graphs = TRUE, na.rm = TRUE)
+M3 <- poLCA(f, data = dfcase_complete, nclass = 4, graphs = TRUE, na.rm = TRUE)
+M4 <- poLCA(f, data = dfcase_complete, nclass = 5, graphs = TRUE, na.rm = TRUE)
+M5 <- poLCA(f, data = dfcase_complete, nclass = 6, graphs = TRUE, na.rm = TRUE)
+M6 <- poLCA(f, data = dfcase_complete, nclass = 7, graphs = TRUE, na.rm = TRUE)
+M7 <- poLCA(f, data = dfcase_complete, nclass = 8, graphs = TRUE, na.rm = TRUE)
+M8 <- poLCA(f, data = dfcase_complete, nclass = 9, graphs = TRUE, na.rm = TRUE)
+M9 <- poLCA(f, data = dfcase_complete, nclass = 10, graphs = TRUE, na.rm = TRUE)
+
+#10-class model has negative degress of freedom, which means is not acceptable model
+ALERT: negative degrees of freedom; respecify model 
+
+plot(M1)
 ```
 
 # Validation: Entropy of fitted latent class models
 ```{r}
-nume.E <- -sum(M1$posterior * log(M1$posterior))
+nume.E <- -sum(M4$posterior * log(M4$posterior))
 ##Denominator (n*log(K)): ## n is a sample size, and K is a number of class
-deno.E <- 4092*log(2)
+deno.E <- 2812*log(5)
 ##Relative Entropy
 Entro <- 1-(nume.E/deno.E)
 Entro
 ```
 
+###using Ohlsen code model 2 to ten class####
+
+To get the standard-output for the best model from the poLCA-package:
+```{r}
+# define function
+f<-with(dfcase_complete, cbind(neglected_food, household_violence, poor_health2, emotional_abuse, migration_yo, early_infection)~1) #
+
+#------ run a sequence of models with 1-10 classes and print out the model with the lowest BIC
+max_II <- -100000
+min_bic <- 100000
+for(i in 2:10){
+  lc <- poLCA(f, dfcase_complete, nclass=i, maxiter=3000, 
+              tol=1e-5, na.rm=FALSE,  
+              nrep=10, verbose=TRUE, calc.se=TRUE)
+  if(lc$bic < min_bic){
+    min_bic <- lc$bic
+    LCA_best_model<-lc
+  }
+}    	
+LCA_best_model
+```
+
+
+Generate table showing fitvalues of multiple models
+Table for comparison of various model-fit values
+```{r}
+## models with different number of groups without covariates:
+set.seed(01012)
+lc1<-poLCA(f, data=dfcase_complete, nclass=1, na.rm = FALSE, nrep=30, maxiter=3000) #Loglinear independence model.
+lc2<-poLCA(f, data=dfcase_complete, nclass=2, na.rm = FALSE, nrep=30, maxiter=3000)
+lc3<-poLCA(f, data=dfcase_complete, nclass=3, na.rm = FALSE, nrep=30, maxiter=3000)
+lc4<-poLCA(f, data=dfcase_complete, nclass=4, na.rm = FALSE, nrep=30, maxiter=3000) 
+lc5<-poLCA(f, data=dfcase_complete, nclass=5, na.rm = FALSE, nrep=30, maxiter=3000)
+lc6<-poLCA(f, data=dfcase_complete, nclass=6, na.rm = FALSE, nrep=30, maxiter=3000)
+
+# generate dataframe with fit-values
+
+results <- data.frame(Modell=c("Modell 1"),
+                      log_likelihood=lc1$llik,
+                      df = lc1$resid.df,
+                      BIC=lc1$bic,
+                      ABIC=  (-2*lc1$llik) + ((log((lc1$N + 2)/24)) * lc1$npar),
+                      CAIC = (-2*lc1$llik) + lc1$npar * (1 + log(lc1$N)), 
+                      likelihood_ratio=lc1$Gsq)
+results$Modell<-as.integer(results$Modell)
+results[1,1]<-c("Modell 1")
+results[2,1]<-c("Modell 2")
+results[3,1]<-c("Modell 3")
+results[4,1]<-c("Modell 4")
+results[5,1]<-c("Modell 5")
+results[6,1]<-c("Modell 6")
+
+results[2,2]<-lc2$llik
+results[3,2]<-lc3$llik
+results[4,2]<-lc4$llik
+results[5,2]<-lc5$llik
+results[6,2]<-lc6$llik
+
+results[2,3]<-lc2$resid.df
+results[3,3]<-lc3$resid.df
+results[4,3]<-lc4$resid.df
+results[5,3]<-lc5$resid.df
+results[6,3]<-lc6$resid.df
+
+results[2,4]<-lc2$bic
+results[3,4]<-lc3$bic
+results[4,4]<-lc4$bic
+results[5,4]<-lc5$bic
+results[6,4]<-lc6$bic
+
+results[2,5]<-(-2*lc2$llik) + ((log((lc2$N + 2)/24)) * lc2$npar) #abic
+results[3,5]<-(-2*lc3$llik) + ((log((lc3$N + 2)/24)) * lc3$npar)
+results[4,5]<-(-2*lc4$llik) + ((log((lc4$N + 2)/24)) * lc4$npar)
+results[5,5]<-(-2*lc5$llik) + ((log((lc5$N + 2)/24)) * lc5$npar)
+results[6,5]<-(-2*lc6$llik) + ((log((lc6$N + 2)/24)) * lc6$npar)
+
+results[2,6]<- (-2*lc2$llik) + lc2$npar * (1 + log(lc2$N)) #caic
+results[3,6]<- (-2*lc3$llik) + lc3$npar * (1 + log(lc3$N))
+results[4,6]<- (-2*lc4$llik) + lc4$npar * (1 + log(lc4$N))
+results[5,6]<- (-2*lc5$llik) + lc5$npar * (1 + log(lc5$N))
+results[6,6]<- (-2*lc6$llik) + lc6$npar * (1 + log(lc6$N))
+
+results[2,7]<-lc2$Gsq
+results[3,7]<-lc3$Gsq
+results[4,7]<-lc4$Gsq
+results[5,7]<-lc5$Gsq
+results[6,7]<-lc6$Gsq
+```
+
+
+Calculate the Entropy (a pseudo-r-squared) for each solution following Daniel Oberski´s Presentation on LCA.
+```{r}
+entropy<-function (p) sum(-p*log(p))
+
+results$R2_entropy
+results[1,8]<-c("-")
+
+error_prior<-entropy(lc2$P) # class proportions model 2
+error_post<-mean(apply(lc2$posterior,1, entropy),na.rm = TRUE)
+results[2,8]<-round(((error_prior-error_post) / error_prior),3)
+
+error_prior<-entropy(lc3$P) # class proportions model 3
+error_post<-mean(apply(lc3$posterior,1, entropy),na.rm = TRUE)
+results[3,8]<-round(((error_prior-error_post) / error_prior),3)
+
+error_prior<-entropy(lc4$P) # class proportions model 4
+error_post<-mean(apply(lc4$posterior,1, entropy),na.rm = TRUE)
+results[4,8]<-round(((error_prior-error_post) / error_prior),3)
+
+error_prior<-entropy(lc5$P) # class proportions model 5
+error_post<-mean(apply(lc5$posterior,1, entropy),na.rm = TRUE)
+results[5,8]<-round(((error_prior-error_post) / error_prior),3)
+
+error_prior<-entropy(lc6$P) # class proportions model 6
+error_post<-mean(apply(lc6$posterior,1, entropy),na.rm = TRUE)
+results[6,8]<-round(((error_prior-error_post) / error_prior),3)
+
+# combining results to a dataframe
+colnames(results)<-c("Model","log-likelihood","resid. df","BIC","aBIC","cAIC","likelihood-ratio","Entropy")
+lca_results<-results
+
+View(lca_results)
+
+
+# Another possibility which is prettier and easier to do:
+install.packages("ztable")
+ztable::ztable(lca_results)
+```
+
+
+To apply an Elbow-Plot (or Scree-Plot) to see, which solution is parsimonius (the simplest and most reasonable explanantion) and has good fit-values. 
+
+```{r}
+# plot 1
+
+# Order categories of results$model in order of appearance
+install.packages("forcats")
+library("forcats")
+#results$model < - as_factor(results$model) 
+
+#convert to long format
+results2<-tidyr::gather(results,Kriterium,Guete,4:7)
+results2
+
+#plot
+fit.plot<-ggplot(results2) + 
+  geom_point(aes(x=Model,y=Guete),size=3) +
+  geom_line(aes(Model, Guete, group = 1)) +
+  theme_bw()+
+  labs(x = "", y="", title = "") + 
+  facet_grid(Kriterium ~. ,scales = "free") +
+  theme_bw(base_size = 16, base_family = "") +   
+  theme(panel.grid.major.x = element_blank() ,
+        panel.grid.major.y = element_line(colour="grey", size=0.5),
+        legend.title = element_text(size = 16, face = 'bold'),
+        axis.text = element_text(size = 16),
+        axis.title = element_text(size = 16),
+        legend.text=  element_text(size=16),
+        axis.line = element_line(colour = "black")) # Achsen etwas dicker
+
+# save 650 x 800
+fit.plot
+```
+
+Inspect population shares of classes
+```{r}
+round(colMeans(LCA_best_model$posterior)*100,2)
+```
+
+
+To inspect the estimated class memberships:
+```{r}
+table(LCA_best_model$predclass)
+
+round(prop.table(table(LCA_best_model$predclass)),4)*100
+```
+
+Ordering of latent classes
+```{r}
+#extract starting values from our previous best model (with 3 classes)
+probs.start<-LCA_best_model$probs.start
+
+#re-run the model, this time with "graphs=TRUE"
+lc<-poLCA(f, dfcase_complete, nclass=2, probs.start=probs.start,graphs=TRUE, na.rm=TRUE, maxiter=3000)
+
+# If you don´t like the order, reorder them (here: Class 1 stays 1, Class 3 becomes 2, Class 2 becomes 1)
+new.probs.start<-poLCA.reorder(probs.start, c(1,2))
+
+#run polca with adjusted ordering
+lc<-poLCA(f, dfcase_complete, nclass=2, probs.start=new.probs.start,graphs=TRUE, na.rm=TRUE)
+lc
+
+```
+
+Plotting
+```{r}
+lcmodel <- reshape2::melt(lc$probs, level=2)
+zp1 <- ggplot(lcmodel,aes(x = L2, y = value, fill = Var2))
+zp1 <- zp1 + geom_bar(stat = "identity", position = "stack")
+zp1 <- zp1 + facet_grid(Var1 ~ .) 
+zp1 <- zp1 + scale_fill_brewer(type="seq", palette="Black") +theme_bw()
+zp1 <- zp1 + labs(x = "Adverse Childhood Experiences",y="Percentage of item\n response categories", fill ="Response Categories")
+zp1 <- zp1 + theme( axis.text.y=element_blank(),
+                    axis.ticks.y=element_blank(),                    
+                    panel.grid.major.y=element_blank())
+zp1 <- zp1 + guides(fill = guide_legend(reverse=TRUE))
+print(zp1)
+```
 
 
 ```{r}
-POST = round(M1$posterior,2)
-rownames(POST) = rownames(M1$y)
-
-# we can check that the rownames of posterior values are indeed those complete values in original data
-table(rownames(dfsabe1)[complete.cases(dfsabe1)] == rownames(POST))
-View(M1$y)
+zp2 <- ggplot(lcmodel,aes(x = Var1, y = value, fill = Var2))
+zp2 <- zp2 + geom_bar(stat = "identity", position = "stack")
+zp2 <- zp2 + facet_wrap(~ L2)
+zp2 <- zp2 + scale_x_discrete("Adverse Childhood Experiencess", expand = c(0, 0))
+zp2 <- zp2 + scale_y_continuous("Probabilities \n item response categories", expand = c(0, 0))
+zp2 <- zp2 + scale_fill_brewer(type="seq", palette="Blue") +
+  theme_bw()
+zp2 <- zp2 + labs(fill ="Response Categories")
+zp2 <- zp2 + theme( axis.text.y=element_blank(),
+                    axis.ticks.y=element_blank(),                    
+                    panel.grid.major.y=element_blank()#,
+                    #legend.justification=c(1,0), 
+                    #legend.position=c(1,0)
+)
+zp2 <- zp2 + guides(fill = guide_legend(reverse=TRUE))
+print(zp2)
 ```
 
-Generate table showing fitvalues of multiple models
-Now we build a table for comparison of various model-fit values like this:
+
+```{r}
+dfcase_complete %>%
+  mutate(Class = LCA_best_model$predclass) %>%
+  group_by(Class) %>%
+  summarise_all("mean")
+```
+
+#find means of each cluster
+```{r}
+aggregate(dfcase_complete, by=list(Class = LCA_best_model$predclass), mean)
+```
+
+
+```{r}
+mytable <- table(dfcase_complete$Class)
+mytable
+```
+
+dfcase_complete$Class <- LCA_best_model$predclass
+View(dfcase_complete)
+
+```{r}
+dfcase_complete$Class <- factor(dfcase_complete$Class,
+                levels = c("1","2"),
+                labels = c("Low-risk", "High-risk"))
+
+Desc(dfcase_complete$Class)
+```
+
+save new datset with class for each individual
+```{r}
+writexl::write_xlsx( x = dfcase_complete, path =  '/Users/macbookpro/Documents/PhD Project/Data/SABE/dataframes/dfcase_complete.xlsx' )
+```
+
+
+class(dfcase_complete$age)
+dfcase_complete$age      <- as.numeric(as.character(dfcase_complete$age))
+
+
+Baseline characteristics (2015) of the study population at time of 60 years or older by the two estimated trajectory groups.
+
+```{r Test bioage}
+table_acebio <-table1(~age + sex + race + childhood_sep + Class + kdm0 + kdm_advance0 + hd + raw_dist + hdl + ldl +tchol + trig + glucose + hba1c + sbp + dbp + bmi_3 + wc + smoking + alcohol  | Class, data=dfbioage)
+
+table_acebio
+```
+
+Baseline characteristics (2015) of the study population at time of 60 years or older by the two estimated trajectory groups.
+
+```{r}
+table_class1 <-table1(~age + sex + ethnic_group + area_residence + childhood_sep + current_sep + sep_occupation + educational_level + health_insurance + hta + cvd + diabetes | Class, data=dfcase_complete)
+
+table_class1
+```
+
+
+Baseline characteristics (2015) of the study population by the childhood adversity.
+```{r}
+table_class_cg <- compareGroups( data = dfcase_complete, 
+               formula = Class ~ age + sex + ethnic_group + area_residence + childhood_sep + Class + current_sep + sep_occupation + educational_level + health_insurance)
+
+table_class_ci <- createTable(x = table_class_cg, show.ci = T, show.n = T, show.all = T )
+
+export2word( x = table_class_ci, file = '/Users/macbookpro/Documents/PhD Project/Data/SABE/Outputs/table_class_ci.docx')
+```
+```
+
+Risk factors of cardiometabolic health by age and high-adversity groups
+
+Table risks behaviors
+
+```{r}
+table_risk <-table1(~smoking + alcohol + raised_bp + raised_bmi + high_cholesterol2 + wc | Class, data=dfcase_complete)
+
+table_risk
+
+table_risk_cg <- compareGroups( data = dfcase_complete, 
+               formula = Class ~ smoking + alcohol + raised_bp + raised_bmi + high_cholesterol2 + wc)
+
+table_risk_ci <- createTable(x = table_risk_cg, show.ci = T, show.n = T, show.all = T )
+
+export2word( x = table_risk_ci, file = '/Users/macbookpro/Documents/PhD Project/Data/SABE/Outputs/table_risk_ci.docx')
+
+```
+
+
+Table Frequencies of individual major and potentially adverse chidhood experiencies at 15 years or younger (n=2,812)
+
+```{r}
+table_aces <-table1(~emotional_abuse + neglected_food + poor_health2 + early_infection + household_violence + migration_yo + childhood_sep | sex, data=dfcase_complete)
+
+table_aces
+
+table_aces_cg <- compareGroups( data = dfcase_complete, 
+               formula = sex ~ emotional_abuse + neglected_food + poor_health2 + early_infection + household_violence + migration_yo + childhood_sep)
+
+table_aces_ci <- createTable(x = table_aces_cg, show.ci = T, show.n = T, show.all = T )
+
+export2word( x = table_aces_ci, file = '/Users/macbookpro/Documents/PhD Project/Data/SABE/Outputs/table_aces_ci.docx')
+
+```
+
+
+
+
+```{r}
+# Change line types by groups (supp)
+ggplot(dfcase_complete, aes(x=age, y=total_cholesterol, group=Class)) +
+  geom_line(aes(linetype=Class))+
+  geom_point()
+  
+# Change line types, point shapes and colors
+ggplot(df, aes(x=dose, y=len, group=supp)) +
+  geom_line(aes(linetype=supp, color = supp))+
+  geom_point(aes(shape=supp, color = supp))
+````
+
+
+#Hytpothesis testing#
+
+ggcorrmat
+ggcorrmat makes a correlalogram (a matrix of correlation coefficients) with minimal amount of code. Just sticking to the defaults itself produces publication-ready correlation matrices. But, for the sake of exploring the available options, let’s change some of the defaults. For example, multiple aesthetics-related arguments can be modified to change the appearance of the correlation matrix.
+
+
+install.packages("ggstatsplot")
+library(ggstatsplot)  
+
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfcase_complete,
+  x     = Class,
+  y     = triglycerides,
+  title = "Distribution of triglycerides across risk groups"
+)
+
+```
+
+Grouping by sex
+```{r}
+set.seed(123)
+
+grouped_ggbetweenstats(
+  data             = dplyr::filter(dfcase_complete, sex %in% c("female", "male")),
+  x                = Class,
+  y                = triglycerides,
+  grouping.var     = sex,
+  outlier.tagging  = TRUE,
+  ggsignif.args    = list(textsize = 4, tip_length = 0.01),
+  p.adjust.method  = "bonferroni",
+  palette          = "default_jama",
+  package          = "ggsci",
+  plotgrid.args    = list(nrow = 1),
+  annotation.args  = list(title = "Differences in Triglycerides by childhood adversity for sex")
+)
+
+```
+
+install.packages("ggcorrplot")
+library(ggstatsplot)  
+
+```{r}
+correlalogram$hta      <- as.numeric(as.character(correlalogram$hta))
+correlalogram$diabetes <- as.numeric(as.character(correlalogram$diabetes))
+correlalogram$cvd      <- as.numeric(as.character(correlalogram$cvd))
+
+
+correlalogram$household_violence      <- as.factor(as.character(correlalogram$household_violence))
+correlalogram$early_infection  <- as.factor(as.character(correlalogram$early_infection))
+correlalogram$neglected_food  <- as.factor(as.character(correlalogram$neglected_food))
+correlalogram$childhood_sep  <- as.factor(as.character(correlalogram$childhood_sep))
+correlalogram$Class          <- as.factor(as.character(correlalogram$Class))
+
+```
+
+
+
+```{r}
+set.seed(123)
+
+## as a default this function outputs a correlation matrix plot
+ggcorrmat(
+  data     = correlalogramtest,
+  colors   = c("#B2182B", "white", "#4D4D4D"),
+  title    = "Correlalogram for SABE subsample dataset n=2,812",
+  subtitle = "correlalogram (a matrix of correlation coefficients)"
+)
+```
+
+
+###FIN LCA####
 
 
 
 #Save data base.
-writexl::write_xlsx( x = dfsabe1, path =  '/Users/macbookpro/Documents/PhD Project/Data/SABE/dataframes/dfsabe1.xlsx' )
-
-
-
-
 
 
 **** Annotations vector transformation****
@@ -550,14 +979,17 @@ Freq(dfaces1$neglected_food, useNA = "always")
 
 ```
 
-Using Original database (n=23,694 individuals)
+##Using Original database (n=23,694 individuals)##
 
 Load data and have a loot at the original data in Excel. Recommendation: load data as .txt file to facilitate poLCA to process data easily.
 
-```{r}
+```{r Using LCA original database n=23,694}
 #dfaces <- read_excel("/Users/macbookpro/Documents/PhD Project/Data/SABE/Dataframes/dfaces.xlsx")
 #skimr::skim(dfaces)
+```
 
+
+```{r}
 dforiginal <- read.delim (file.choose (), header = TRUE)
 View(dforiginal)
 ```
@@ -637,11 +1069,11 @@ M4 <- poLCA(f, data = dfaces1, nclass = 5, graphs = TRUE, na.rm = TRUE)
 ```
 
 We will preffer the lower value for BIC as the better model.
-So based on the BIC value, we chood Model 1 with lower BIC indicating better model fit (Nylund et al., 2007) and with two latent groups for our data.
+So based on the BIC value, we choose Model 1 with lower BIC indicating better model fit (Nylund et al., 2007) and with two latent groups for our data.
 
-By observing the graph, we can see that participants in the group 1 (76%), have a higher level of adversities in the childhood (High adversity group).
+By observing the graph, we can see that participants in the group 2 (76%), have less adversities in the childhood (lower risk group).
 
-In contrants, participants in the group 2 (24% of the subsample)  reported less adversities in childhood (Lowe adversity group), early-life infection is more likely to be lower.
+In contrants, participants in the group 1 (24% of the subsample)  reported greater adversities in childhood (high-risk group).
 
 
 ```{r}
@@ -650,5 +1082,384 @@ SABE_Colombia <- read_excel("~/Documents/PhD Project/Data/SABE/Dataframes/SABE_C
 myvars <- c("neglected_food","household_violence","emotional_abuse","poor_health2", "migration")
 dfsabe1 <- SABE_Colombia[myvars]
 View(dfsabe1)
+```
 
 
+######
+Clustering using complete case dataset (excluding NA)
+######
+
+SABE imputed submsample (n=2,812)
+
+```{r Using LCA original database n=2,812}
+library(readxl)
+dfcase_complete_clustering <- read_excel("Dataframes/dfcase_complete_clustering.xlsx")
+View(dfcase_complete_clustering)   
+```
+
+check NA values in dataset
+```{r}
+skimr::skim(dfcase_complete_clustering_clustering)
+```
+
+#k-means clustering (number of class is fixed using a supervised technique).
+```{r}
+library(factoextra) 
+k2 <- kmeans(dfcase_complete_clustering, centers = 2, nstart = 25)
+k2
+```
+
+Scree Plot to see the variabilities in clusters
+```{r}
+wss <- (nrow(nor)-1)*sum(apply(nor,2,var))
+for (i in 2:20) wss[i] <- sum(kmeans(nor, centers=i)$withinss)
+plot(1:20, wss, type="b", xlab="Number of Clusters", ylab="Within groups sum of squares")
+```
+
+#Optimal number of clusters
+
+Elbow method: looks at the total within-cluster sum of square (WSS) as a function of the number of clusters.
+```{r}
+fviz_nbclust(dfcase_complete, kmeans, method = "wss")
+```
+
+# compute gap statistic to compare the total intracluster variation for different values of k with their expected values under null reference distribution of the data.
+```{r}
+gap_stat <- clusGap(dfcase_complete_clustering, FUN = kmeans, nstart = 25,
+                    K.max = 10, B = 50)
+fviz_gap_stat(gap_stat)
+gap_stat
+```
+
+
+Clustering Validation: Average Silhouette Method
+
+We use the silhouette coefficient (silhouette width) to evaluate the goodness of our clustering.
+So, the interpretation of the silhouette width is the following:
+
+Si > 0 means that the observation is well clustered. The closest it is to 1, the best it is clustered.
+Si < 0 means that the observation was placed in the wrong cluster.
+Si = 0 means that the observation is between two clusters.
+
+The silhouette plot below gives us evidence that our clustering using five groups is good because there’s no negative silhouette width and most of the values are bigger than 0.5.
+
+```{r}
+library(cluster)
+sil <- silhouette(km$cluster, dist(dfcase_complete_clustering))
+fviz_silhouette(sil)
+```
+
+Extracting Results
+With most of these approaches suggesting 2 as the number of optimal clusters, we can perform the final analysis and extract the results using 2 clusters.
+
+# Compute k-means clustering with k = 3
+```{r}
+set.seed(123)
+final <- kmeans(dfcase_complete_clustering, 2, nstart = 25)
+print(final)
+```
+
+
+```{r}
+library(parameters)
+install.packages('NbClust')
+install.packages('mclust')
+install.packages('see')
+
+n_clust <- n_clusters(dfcase_complete_clustering,
+                      package = c("easystats", "NbClust", "mclust"),
+                      standardize = FALSE)
+n_clust
+
+plot(n_clust)
+```
+
+
+If there are more than two dimensions (variables) fviz_cluster perform principal component analysis (PCA) and plot the data points according to the first two principal components that explain the majority of the variance.
+```{r}
+str(k2)
+fviz_cluster(k2, data = dfcase_complete_clustering)
+```
+
+
+Normalization
+```{r}
+z <- dfcase_complete_clustering[,-c(1,1)]
+means <- apply(z,2,mean)
+sds <- apply(z,2,sd)
+nor <- scale(z,center=means,scale=sds)
+```
+
+Calculate distance matrix
+```{r}
+distance = dist(nor)
+```
+
+
+#Hierarchical agglomerative clustering 
+```{r}
+mydata.hclust = hclust(distance)
+plot(mydata.hclust)
+plot(mydata.hclust,labels=dfaces$neglected_food,main='Default from hclust', ylab = "Height", nodePar = nodePar, leaflab = "none")
+plot(mydata.hclust,hang=-1, labels=dfaces$neglected_food,main='Default from hclust')
+
+distxy <- dist(mydata.hclust)
+```
+
+
+***Approach two: to conduct Latent Class Analysis (LCA) in R with poLCA package subsample biomarkers n=4,092***
+
+Four variables: neglected food, household violence, emotional abuse, early-life infection, and poor health reported at 15 years old. 
+
+Outputs:
+Table 1. Sample Characteristics of older people (Aged 60 Years and more) in Colombia, 2015 (N = 4,092).
+Table 2. Evaluating Class Solutions.
+
+Install and load poLCA package
+install.packages ("poLCA")
+library (poLCA)
+library(readxl)
+
+
+```{r Using LCA subsample database n=4,092}
+dfcase_complete_clustering$poor_health2    <- factor(dfcase_complete_clustering$poor_health2)
+dfcase_complete_clustering$neglected_food  <- factor(dfcase_complete_clustering$neglected_food)
+dfcase_complete_clustering$emotional_abuse <- factor(dfcase_complete_clustering$emotional_abuse)
+dfcase_complete_clustering$sex             <- factor(dfcase_complete_clustering$sex)
+dfcase_complete_clustering$household_violence <- factor(dfcase_complete_clustering$household_violence)
+dfcase_complete_clustering$early_infection    <- factor(dfcase_complete_clustering$early_infection)
+
+```
+
+
+Define our LCA model with original data base.
+It is straightforward to replicate using the series of commands:
+```{r}
+f  <- cbind (neglected_food, household_violence, poor_health2, emotional_abuse, early_infection) ~ 1
+M1 <- poLCA(f, data = dfcase_complete_clustering, nclass = 2, graphs = TRUE, na.rm = TRUE)
+M2 <- poLCA(f, data = dfcase_complete_clustering, nclass = 3, graphs = TRUE, na.rm = TRUE)
+M3 <- poLCA(f, data = dfcase_complete_clustering, nclass = 4, graphs = TRUE, na.rm = TRUE)
+M4 <- poLCA(f, data = dfcase_complete_clustering, nclass = 5, graphs = TRUE, na.rm = TRUE)
+M5 <- poLCA(f, data = dfcase_complete_clustering, nclass = 6, graphs = TRUE, na.rm = TRUE)
+```
+
+# Validation: Entropy of fitted latent class models
+```{r}
+nume.E <- -sum(M5$posterior * log(M5$posterior))
+##Denominator (n*log(K)): ## n is a sample size, and K is a number of class
+deno.E <- 4092*log(6)
+##Relative Entropy
+Entro <- 1-(nume.E/deno.E)
+Entro
+```
+
+
+```{r}
+POST = round(M1$posterior,2)
+rownames(POST) = rownames(M1$y)
+
+# we can check that the rownames of posterior values are indeed those complete values in original data
+table(rownames(dfcase_complete_clustering1)[complete.cases(dfcase_complete_clustering1)] == rownames(POST))
+View(M1$y)
+```
+
+#Save data base.
+writexl::write_xlsx( x = dfcase_complete_clustering1, path =  '/Users/macbookpro/Documents/PhD Project/Data/SABE/dataframes/dfcase_complete_clustering1.xlsx' )
+
+
+Interpretation of the outcome: using biomarkers subsample the best number of cluster to this dataset is 2, on the basis of lower BIC indicating better model fit and with two latent groups for our data.
+
+
+#####TABLES adding biological markers dataset n=2,812#####
+
+Baseline characteristics (2015) of the study population at time of 60 years or older by the two estimated trajectory groups.
+
+```{r Test bioage}
+table_acebio <-table1(~age + sex + race + childhood_sep + Class + kdm0 + kdm_advance0 + hd + raw_dist + hdl + ldl +tchol + trig + glucose + hba1c + sbp + dbp + bmi_3 + wc + smoking + alcohol  | Class, data=dfbioage)
+
+table_acebio
+```
+
+comparison groups
+```{r}
+table_lcba_cg <- compareGroups( data = dfbioage, 
+               formula = Class ~ age + sex + race + childhood_sep + kdm0 + kdm_advance0 + hdl + ldl +tchol + trig + glucose + hba1c + sbp + dbp + bmi_2 + wc + smoking + alcohol + raised_bp + raised_bmi + high_chol2 + current_sep + education + sep_occupation + health_insurance + social.cash.transfer + hta + cvd + diabetes + raised_bmi)
+
+table_lcba_ci <- createTable(x = table_lcba_cg, show.ci = T, show.n = T, show.all = T )
+
+table_lcba_ci
+
+export2word( x = table_lcba_ci, file = '/Users/macbookpro/Documents/PhD Project/Data/SABE/Outputs/table_lcba_ci.docx')
+```
+
+correlation between aces and adversity groups
+
+```{r}
+aces = c("emotional_abuse", "neglected_food", "poor_health2", "early_infection", "household_violence", "migration_yo", "childhood_sep", "Class")
+
+#install.packages("ggstatsplot")
+#library(ggstatsplot)
+
+
+corr_aces$emotional_abuse   <- as.factor(as.character(corr_aces$emotional_abuse))
+corr_aces$neglected_food    <- as.factor(as.character(corr_aces$neglected_food))
+corr_aces$poor_health2      <- as.factor(as.character(corr_aces$poor_health2))
+corr_aces$early_infection   <- as.factor(as.character(corr_aces$early_infection))
+corr_aces$household_violence   <- as.factor(as.character(corr_aces$household_violence))
+corr_aces$migration_yo      <- as.factor(as.character(corr_aces$migration_yo))
+corr_aces$childhood_sep     <- as.factor(as.character(corr_aces$childhood_sep))
+corr_aces$Class             <- as.factor(as.character(corr_aces$Class ))
+
+
+set.seed(123)
+
+
+## as a default this function outputs a correlation matrix plot
+ggcorrmat(data=corr_aces,
+  colors   = c("#B2182B", "white", "#4D4D4D"),
+  title    = "Correlalogram for adverse childhood experiences dataset",
+  subtitle = "Pearson correlation dimensions of adversity at 15 years of younger"
+)
+```
+
+Correlation matriz with aces
+```{r}
+str(corr_aces)
+```
+
+
+```{r}
+library(ggplot2)
+install.packages("corrplot")
+library(corrplot)
+
+install.packages("vcd")
+library(vcd)
+```
+
+Correlation plot with ggscatterstats
+```{r}
+library(ggstatsplot)
+install.packages ("ggsid")
+library(ggsid)
+```
+
+
+correlation aces with risk groups
+```{r}
+
+library(correlation)
+results <- correlation(corr_aces)
+install.packages("compareGroups")
+library(compareGroups)
+```
+
+
+```{r}
+corr_aces
+summary(corr_aces)
+sumstat_aces <-summary(results, redundant = TRUE)
+
+correlation(corr_aces[-2], method = "auto")
+```
+
+
+# pipe-friendly usage with  grouped dataframes from {dplyr} package
+if (require("poorman")) {
+  corr_aces %>%
+    correlation(select = "")
+
+  # Grouped dataframe
+  # grouped correlations
+  corr_aces %>%
+    group_by() %>%
+    correlation()
+}
+
+# automatic selection of correlation method
+
+
+write.table(sumstat_aces, file = "sumstat_aces.doc", sep = ",", quote = FALSE, row.names = F)
+
+
+
+```{r}
+cor(Class, corr_aces)
+```
+
+export2word( x = table_corr, file = '/Users/macbookpro/Documents/PhD Project/Data/SABE/Outputs/table_corr.docx')
+
+
+Now that we have a clean dataset, we can start asking some interesting questions. For example, let’s see if the average early-lifect infection of food insecurity have any relationship to adversity group or childhood SEP. Additionally, let’s also see which adversities in childhood had a higher risk but lower SEP by labeling those data points.
+```{r}
+## for reproducibility
+set.seed(123)
+
+## plot
+ggscatterstats(
+  data = corr_aces, ## dataframe from which variables are taken
+  x = Class, ## predictor/independent variable
+  y = early_infection, ## dependent variable
+  xlab = "Adversity risk", ## label for the x-axis
+  ylab = "Early-life infection at 15 yo or younger", ## label for the y-axis
+  label.var = title, ## variable to use for labeling data points
+  point.label.args = list(alpha = 0.7, size = 4, color = "grey50"),
+  xfill = "#CC79A7", ## fill for marginals on the x-axis
+  yfill = "#009E73", ## fill for marginals on the y-axis
+  title = "Relationship between classes and early-life infection"
+)
+```
+
+
+```{r}
+
+## as a default this function outputs a correlation matrix plot
+ggcorrmat(data=corr_ba,size = 0.05,
+  colors   = c("#B2182B", "white", "#4D4D4D"),
+  title    = "Correlation matrix for biological markers dataset",
+  subtitle = "Pearson correlation biological markers",
+ggcorrplot.args = list(outline.color = "blue", hc.order = TRUE,
+    lab_col = "black",
+    lab_size = 2,
+    tl.srt = 90,
+    pch.col = "red",
+    pch.cex = 5
+  )
+)
+```
+
+Using BO correlation matriz (cooler)
+```{r}
+#select biological age variables
+agevar = c("kdm0","kdm_advance0", "hd", "tchol", "glucose", "hba1c", "trig")
+
+#agevar = c("kdm0","kdm_advance", "hd", "sbp","dbp", "hdl", "ldl", "hba1c", "wc", "bmi_2", "tchol", "glucose", "hba1c", "trig")
+
+#prepare lables
+#values should be formatted for displaying along diagonal of the plot
+#names should be used to match variables and order is preserved
+label = c(
+  "kdm0"="KDM\nBiological Age\nAdvancement",
+  "kdm_advance0"="Modified-KDM\nBiological Age\nAdvancement",
+  "hd" = "Homeostatic\nDysregulation",
+  "tchol"="total cholesterol",
+  "glucose"="glucose",
+  "hba1c"="Gylcated haemoglobin",
+  "trig"="triglyceride")
+
+#use variable name to define the axis type ("int" or "float")
+axis_type = c(
+    "kdm0"="float",
+    "kdm_advance0"="float",
+     "hd"="flot",
+     "tchol"="float",
+     "glucose"="float",
+     "hba1c"="float",
+     "trig"="float"
+)
+
+#plot BAA corplot
+plot_baa(corr_ba,agevar,label,axis_type)
+```
+
+####FIN#### Go to R Markdown Hypothesis testing 
