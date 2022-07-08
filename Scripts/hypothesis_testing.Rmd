@@ -1,0 +1,1361 @@
+---
+title: "Biological age BA hypothesis testing and matrix correlations"
+author: "Juan Rivillas"
+date: "21/06/2022"
+output:
+  html_document: default
+  word_document: default
+---
+
+#This code includes two steps
+-Hypothesis testing to find dependence between variables (BAA, aces, biological markers, exposures, and outcomes) 
+-Matrix correlation and drawing correlalograms to explain dependence.
+
+@Bioage @ggbetweenstats @correlation packages allowed to test following associations:
+1.	Check dispersion and looking for skew in BA (using ggbetweenstats package)
+2.	To test correlations among markers and CA (using correlation package)
+3.	To test associations BA with chronological age (using plot_ba function with age vs bioage vars)
+4.	To test correlations BA with one another (using plot_baa function with BAA corplot)
+5.	BA measures are tested for association with cardiometabolic conditions (using table_health)
+6.	Finally, a set of analyses tests socioeconomic patterning of biological aging algorithms (using table_ses)
+
+
+Load required packages
+```{r}
+install.packages("GGally")
+install.packages("lares")
+install.packages("gtsummary") #export tables
+install.packages("ggbetweenstats")
+
+library(lares) #ranked cross validation of correlations
+library(plyr)
+library(readr)
+library(ggplot2)
+library(GGally)
+library(dplyr)
+library(mlbench)
+library(correlation)
+library(table1)     #to Create HTML Tables of Descriptive Statistics in epi
+library(gtsummary)
+library(ggstatsplot)
+library(car) ## Loading required package: carData
+
+# install.packages("remotes")
+remotes::install_github("nathaneastwood/poorman")
+install.packages("poorman")
+library(poorman)
+
+```
+
+#Check structure dataset
+```{r}
+glimpse(data)
+```
+
+#Correlation test
+A white box in the correlogram indicates that the correlation is not significantly different from 0 at the specified significance level (in this example, at α=5%) for the couple of variables. A correlation not significantly different from 0 means that there is no linear relationship between the two variables considered in the population (there could be another kind of association, but not linear).
+
+To determine whether a specific correlation coefficient is significantly different from 0, a correlation test has been performed. Remind that the null and alternative hypotheses of this test are:
+
+H0: ρ=0
+H1: ρ≠0
+
+where ρ is denotes the correlation. The correlation test is based on two factors: the number of observations and the correlation coefficient. The more observations and the stronger the correlation between 2 variables, the more likely it is to reject the null hypothesis of no correlation between these 2 variables.
+
+
+
+
+
+
+
+
+
+
+
+The output shows that the data has 24 numerical variables (labeled as 'num') and 30 character variables (labeled as 'chr'). We convert these into factor variables using the line of code below.
+```{r}
+names <- c(2,5,19,22,23,24,25,26,27,28,29,30,33,35,36,37,38)
+dfbioage[,names] <- lapply(dfbioage[,names] , factor)
+glimpse(dfbioage) 
+```
+
+Frequency Table
+Before diving into the chi-square test, it's important to understand the frequency table. Frequency tables are an effective way of finding dependence or lack of it between the two categorical variables and give a first-level view of the relationship between the variables.
+
+In the first line of code below, we create a two-way table between the variables, childhood sep and adult health. 
+The second line prints the frequency table.
+The third line prints the proportion table. 
+The fourth line prints the row proportion table, while the fifth line prints the column proportion table.
+
+This process was iterative to two childhood SEP measures combined them with the three diseases.
+
+Hypothesis testing: childhood SEP and adult health
+```{r}
+# 2 - way table childhood adversity groups
+two_way = table(data$childhood_sep, data$high_bsugar)
+two_way
+
+prop.table(two_way) # cell percentages
+prop.table(two_way, 1) # row percentages
+prop.table(two_way, 2) # column percentages
+```
+
+The output from the column percentages total shows that the individuals in the high-risk group have a probability (at 17.6 percent) of reporting diabetes compared to the low-risk group (82.3 percent). To test whether this insight is statistically significant or not, we conduct the chi-square test of independence.
+
+```{r}
+# 2 - way table childhood adversity groups
+two_way = table(dfbioage$childhood_sep, dfbioage$raised_bp)
+two_way
+
+prop.table(two_way) # cell percentages
+prop.table(two_way, 1) # row percentages
+prop.table(two_way, 2) # column percentages
+```
+The individuals in the high-risk group have a probability (at 15.1 percent) of reporting HTA compared to the low-risk group (84.8 percent).
+
+```{r}
+# 2 - way table childhood adversity groups
+two_way = table(data$Class, data$cvd)
+two_way
+
+prop.table(two_way) # cell percentages
+prop.table(two_way, 1) # row percentages
+prop.table(two_way, 2) # column percentages
+```
+
+Steps to test associations between categorical vars
+
+Using the chi-square test to determine the association between the two categorical variables, childhood SEP and adult disease. We begin by specifying the null and alternative hypothesis, like all statistical tests.
+
+Null Hypothesis H0: The two variables childhood SEP and adult diseases are independent of each other.
+
+Alternate Hypothesis H1: The two variables are related to each other.
+
+The first step is to create a two-way table between the variables under study and to perform the chi-square test using the chisq.test() function. It is easy to use this function as shown below, where the table generated above is passed as an argument to the function, which then generates the test result. 
+
+```{r}
+#Risk groups
+adv_dm <-table(dfbioage$Class, dfbioage$diabetes)
+chisq.test(adv_dm) 
+
+chisq.test(dfbioage$Class, dfbioage$diabetes) #second way
+chisq.test(dfbioage$Class, dfbioage$hta)
+chisq.test(dfbioage$Class, dfbioage$cvd)
+```
+
+Interpretation: Since the p-value is greater than 0.05 in dm and hta, we fail to reject Null Hypothesis. This means there are not enought evidence (data) to find a difference between childhood avdersity and dm and hta. In the other hand, p-value is less than 0.05 in cvd then we reject the null hypothesis that the childhood adversity experiences among surveyed individuals is not associated with cvd in later life.
+
+```{r}
+#Risk groups
+chisq.test(dfbioage$childhood_sep, dfbioage$diabetes) #second way
+chisq.test(dfbioage$childhood_sep, dfbioage$hta)
+chisq.test(dfbioage$childhood_sep, dfbioage$cvd)
+```
+
+Hypothesis testing: adult SEP and health
+```{r}
+# 2 - way table childhood adversity groups
+two_way = table(dfbioage$current_sep, dfbioage$raised_bp)
+two_way
+
+prop.table(two_way) # cell percentages
+prop.table(two_way, 1) # row percentages
+prop.table(two_way, 2) # column percentages
+```
+
+
+```{r}
+# 2 - way table childhood adversity groups
+two_way = table(dfbioage$education, dfbioage$diabetes)
+two_way
+
+prop.table(two_way) # cell percentages
+prop.table(two_way, 1) # row percentages
+prop.table(two_way, 2) # column percentages
+```
+
+Due the small accounts in some groups, we use Fisher's exact text chi sq instead.
+
+```{r}
+#Adult SEP
+fisher.test(dfbioage$current_sep, dfbioage$diabetes) #second way
+fisher.test(dfbioage$education, dfbioage$diabetes)
+fisher.test(dfbioage$sep_occupation, dfbioage$diabetes)
+fisher.test(dfbioage$health_insurance, dfbioage$diabetes) #second way
+fisher.test(dfbioage$social.cash.transfer, dfbioage$diabetes)
+fisher.test(dfbioage$nutrition_program, dfbioage$diabetes)
+
+fisher.test(corr$current_sep, corr$hta) #second way
+fisher.test(dfbioage$education, dfbioage$hta)
+fisher.test(dfbioage$sep_occupation, dfbioage$hta)
+fisher.test(dfbioage$health_insurance, dfbioage$hta) #second way
+fisher.test(dfbioage$social.cash.transfer, dfbioage$hta)
+fisher.test(dfbioage$nutrition_program, dfbioage$hta)
+
+fisher.test(dfbioage$current_sep, dfbioage$cvd) #second way
+fisher.test(dfbioage$education, dfbioage$cvd)
+fisher.test(dfbioage$sep_occupation, dfbioage$cvd)
+fisher.test(dfbioage$health_insurance, dfbioage$cvd) #second way
+fisher.test(dfbioage$social.cash.transfer, dfbioage$cvd)
+fisher.test(dfbioage$nutrition_program, dfbioage$cvd)
+```
+A correlation analysis is a statistical technique that can show whether and how strongly pairs of variables are related, but all features must be numerical. Usually, we have numerous categorical variables in our data, that contains valuable information which might be hard to catch without a correlation analysis.
+
+Now, we explore the most significant correlations using a ranked cross correlations
+
+```{r}
+#test aces vs BA
+corr_cross(corr_aces_baa) 
+
+#Test BA vs markers
+corr_cross(corr_baa)
+
+corr_cross(data)
+corr_cross(corr_aces1)
+corr_cross(corr_sep)
+corr_cross(corr_ba)
+corr_cross(corr)
+corr_cross(corr_risk_baa)
+```
+
+Interpretation: if this value is close to 0, it means that there is no relationship between the variables. When the value is positive (blue color), it means that as one variable gets larger the other gets larger. And, if they are negative it means that as one gets larger, the other gets smaller (often called an “inverse” correlation).(Red color).
+
+Now we check the top correlations of variables and values ranked in descending order. From the plot above we can extract some interesting insights:
+
+- Domestic violence, food insecurity, poor health status, and emotional abuse are inversed correlated with low risk group of childhood adversity. 
+- Poor food environment is commonly among lower childhood sep individuals and domestic violence in childhood.
+- Individuals with cardiovascular diseases are commonly to report hypertension as well.
+- Lower childhood SEP individuals have high risk of childhood adverse experiences.
+- LDL is commonly among individuals with high cholesterol levels.
+- KDM BA and V2 is correlated with LDL, total cholesterol, bmi, hba1c, and triglycerides.
+- Raised body mass index and individuals with high waist size have homestostatic dysregulation.
+
+Plots correlations
+There is another kind of cross-correlation that returns all correlations in a single plot, not necessarily ranked. This will help us understand the skewness or randomness of some correlations found. It will also highlight the highest correlations for each of the variables used.
+
+```{r}
+corr_cross(corr_aces_baa, type = 2)
+corr_cross(corr_baa, type = 2)
+corr_cross(corr_sep, type = 2)
+corr_cross(corr_ba, type = 2)
+
+```
+
+All values must be numerical to the cross-validation
+```{r}
+corr_sep$health_insurance    <- as.factor(as.character(corr_sep$health_insurance))
+corr_sep$sep_occupation      <- as.factor(as.character(corr_sep$sep_occupation))
+corr_sep$education        <- as.factor(as.character(corr_sep$education))
+corr_sep$current_sep      <- as.factor(as.character(corr_sep$current_sep))
+corr_sep$cvd                <- as.factor(as.character(corr_sep$cvd))
+corr$hta                    <- as.factor(as.character(corr$hta))
+corr_sep$diabetes           <- as.factor(as.character(corr_sep$diabetes))
+```
+
+
+Histograms and violin plots
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = data,
+  x     = Class,
+  y     = kdm,
+  title = "Distribution of KDM Biological age across high-risk groups",
+  fill= sex
+)
+```
+
+Interpretation of the outcome:
+uncorrelated KDM: age
+
+test sex
+```{r}
+ggplot(data, aes(y=kdm, x=Class, fill = sex)) + 
+  geom_boxplot() + 
+  theme_classic()
+```
+
+
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = data,
+  x     = Class,
+  y     = kdm_advance,
+  title = "Distribution of KDM Biological age advance across high-risk groups"
+)
+```
+
+test sex
+```{r}
+ggplot(data, aes(y=kdm_advance, x=Class, fill = sex)) + 
+  geom_boxplot() + 
+  theme_classic()
+```
+
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = data,
+  x     = Class,
+  y     = hd,
+  title = "Distribution of homeostatic dysregulation across high-risk groups"
+)
+```
+
+
+test sex
+```{r}
+ggplot(data, aes(y=hd, x=Class, fill = sex)) + 
+  geom_boxplot() + 
+  theme_classic()
+```
+
+
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = data,
+  x     = Class,
+  y     = hd_log,
+  title = "Distribution of raw HD log across high-risk groups"
+)
+```
+
+
+test sex
+```{r}
+ggplot(data, aes(y=hd_log, x=Class, fill = sex)) + 
+  geom_boxplot() + 
+  theme_classic()
+```
+
+
+
+#Childhood SEP
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = data,
+  x     = childhood_sep,
+  y     = kdm,
+  title = "Distribution of KDM Biological age across childhood SEP groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = data,
+  x     = childhood_sep,
+  y     = kdm_advance,
+  title = "Distribution of KDM Biological age advance across childhood SEP groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = data,
+  x     = childhood_sep,
+  y     = hd,
+  title = "Distribution of homeostatic dysregulation across childhood SEP groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = data,
+  x     = childhood_sep,
+  y     = age,
+  title = "Distribution of raw HD log across childhood SEP groups"
+)
+```
+To check distributions biomarkers vs childhood SEP/adversity groups
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = data,
+  x     = Class,
+  y     = ldl,
+  title = "Distribution of LDL across high-risk groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = Class,
+  y     = tchol,
+  title = "Distribution of total cholesterol across high-risk groups"
+)
+```
+
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = Class,
+  y     = glucose,
+  title = "Distribution of glucose across high-risk groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = Class,
+  y     = hba1c,
+  title = "Distribution of hba1c across high-risk groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = Class,
+  y     = trig,
+  title = "Distribution of Triglycerides across high-risk groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = Class,
+  y     = bmi_2,
+  title = "Distribution of body mass index across high-risk groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = Class,
+  y     = wc,
+  title = "Distribution of waist circumference high-risk groups"
+)
+```
+
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = Class,
+  y     = sbp,
+  title = "Distribution of SBP high-risk groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = Class,
+  y     = dbp,
+  title = "Distribution of dbp across high-risk groups"
+)
+```
+
+
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = Class,
+  y     = hdl,
+  title = "Distribution of HDL across high-risk groups"
+)
+```
+
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = childhood_sep,
+  y     = ldl,
+  title = "Distribution of LDL across childhood SEP groups"
+)
+```
+
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = childhood_sep,
+  y     = hdl,
+  title = "Distribution of HDL across childhood SEP groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = childhood_sep,
+  y     = tchol,
+  title = "Distribution of total cholesterol across childhood SEP groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = childhood_sep,
+  y     = glucose,
+  title = "Distribution of glucose across childhood SEP groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = childhood_sep,
+  y     = hba1c,
+  title = "Distribution of hba1c across childhood SEP groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = childhood_sep,
+  y     = trig,
+  title = "Distribution of Triglycerides across childhood SEP groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = childhood_sep,
+  y     = bmi_2,
+  title = "Distribution of BMI across childhood SEP groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = childhood_sep,
+  y     = wc,
+  title = "Distribution of waist circumference across childhood SEP groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = childhood_sep,
+  y     = sbp,
+  title = "Distribution of SBP across childhood SEP groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = childhood_sep,
+  y     = dbp,
+  title = "Distribution of DBP across childhood SEP groups"
+)
+```
+
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = childhood_sep,
+  y     = age,
+  title = "Distribution of cronological age across childhood SEP groups"
+)
+```
+
+```{r}
+set.seed(123)
+
+ggbetweenstats(
+  data  = dfbioage1,
+  x     = Class,
+  y     = age,
+  title = "Distribution of cronological age across childhood adversity groups"
+)
+```
+
+To visualize the distribution of a single variable and check if its mean is significantly different from a specified value with a one-sample test, gghistostats can be used.
+
+```{r}
+set.seed(123)
+
+gghistostats(
+  data       = data,
+  x          = kdm,
+  title      = "Histogram KDM BA",
+  test.value = 12,
+  binwidth   = 1
+)
+```
+
+```{r}
+set.seed(123)
+
+gghistostats(
+  data       = data,
+  x          = kdm_advance,
+  title      = "Histogram KDM BA advance",
+  test.value = 12,
+  binwidth   = 1
+)
+```
+
+```{r}
+set.seed(123)
+
+gghistostats(
+  data       = data,
+  x          = hd_log,
+  title      = "Histogram HD log",
+  test.value = 12,
+  binwidth   = 1
+)
+```
+
+```{r}
+set.seed(123)
+
+gghistostats(
+  data       = data,
+  x          = hd,
+  title      = "Histogram HD",
+  test.value = 12,
+  binwidth   = 1
+)
+```
+
+Histograms biomarkers
+
+```{r}
+set.seed(123)
+
+gghistostats(
+  data       = dfbioage1,
+  x          = ldl,
+  title      = "Histogram LDL",
+  test.value = 12,
+  binwidth   = 1
+)
+```
+
+```{r}
+set.seed(123)
+
+gghistostats(
+  data       = dfbioage1,
+  x          = hdl,
+  title      = "Histogram HDL",
+  test.value = 12,
+  binwidth   = 8
+)
+```
+
+```{r}
+set.seed(123)
+
+gghistostats(
+  data       = dfbioage1,
+  x          = tchol,
+  title      = "Histogram total cholesterol",
+  test.value = 12,
+  binwidth   = 10
+)
+```
+
+```{r}
+set.seed(123)
+
+gghistostats(
+  data       = dfbioage1,
+  x          = glucose,
+  title      = "Histogram glucose",
+  test.value = 12,
+  binwidth   = 6
+)
+```
+
+
+
+```{r}
+ggscatterstats(
+  data  = data,
+  x     = age,
+  y     = kdm,
+  xlab  = "Cronological age",
+  ylab  = "Biological age measure",
+  title = "Understanding biological age vs cronological age"
+)
+```
+
+
+```{r}
+ggscatterstats(
+  data  = data,
+  x     = age,
+  y     = kdm_advance,
+  xlab  = "Cronological age",
+  ylab  = "Biological age measure KDM modified",
+  title = "Understanding biological age vs cronological age"
+)
+```
+
+```{r}
+ggscatterstats(
+  data  = data,
+  x     = age,
+  y     = hd_log,
+  xlab  = "Cronological age",
+  ylab  = "Homeostatic Dysregulation",
+  title = "Understanding homeostatic dysregulation vs cronological age"
+)
+```
+
+Test correlograms using other package
+ggcorrmat makes a correlalogram (a matrix of correlation coefficients) with minimal amount of code. Just sticking to the defaults itself produces publication-ready correlation matrices. But, for the sake of exploring the available options, let’s change some of the defaults. For example, multiple aesthetics-related arguments can be modified to change the appearance of the correlation matrix.
+
+```{r}
+set.seed(123)
+
+## as a default this function outputs a correlation matrix plot
+ggcorrmat(
+  data     = corr_baa,
+  colors   = c("#B2182B", "white", "#4D4D4D"),
+  title    = "Correlalogram for biological age measures dataset",
+  subtitle = "Klemera-Doubal method (KDM) Biological Age and homeostatic dysregulation (HD)"
+)
+```
+
+
+Incluyendo biological markers 
+```{r}
+set.seed(123)
+
+## as a default this function outputs a correlation matrix plot
+ggcorrmat(
+  data     = corr_aces_baa, 
+  colors   = c("#B2182B", "white", "#4D4D4D"),
+  title    = "Correlalogram for biological markers dataset",
+  subtitle = "Biological Age measures and biological markers",
+  number.cex = 0.001, cl.cex = 0.5, tl.cex = 0.5
+)
+```
+
+The function ggcoefstats generates dot-and-whisker plots for regression models saved in a tidy data frame. The tidy dataframes are prepared using parameters::model_parameters(). Additionally, if available, the model summary indices are also extracted from performance::model_performance().
+
+Although the statistical models displayed in the plot may differ based on the class of models being investigated, there are few aspects of the plot that will be invariant across models:
+
+The dot-whisker plot contains a dot representing the estimate and their confidence intervals (95% is the default). The estimate can either be effect sizes (for tests that depend on the F-statistic) or regression coefficients (for tests with t-, ^{2}-, and z-statistic), etc. The function will, by default, display a helpful x-axis label that should clear up what estimates are being displayed. The confidence intervals can sometimes be asymmetric if bootstrapping was used.
+
+The label attached to dot will provide more details from the statistical test carried out and it will typically contain estimate, statistic, and p-value.e
+
+The caption will contain diagnostic information, if available, about models that can be useful for model selection: The smaller the Akaike’s Information Criterion (AIC) and the Bayesian Information Criterion (BIC) values, the “better” the model is.
+
+The output of this function will be a ggplot2 object and, thus, it can be further modified (e.g. change themes) with ggplot2 functions.
+
+
+#chance cronological age from factor to numeric vector
+dfbioage$sex    <- as.factor(as.character(dfbioage$sex))
+dfbioage$Class    <- as.factor(as.character(dfbioage$Class))
+
+
+
+
+Analysis of Variance (ANOVA)
+
+The Analysis of Variance (ANOVA) test is used to determine if the categorical group ('Childhood SEP') has any impact on the numerical variable ('Biological age'). In our case, the null hypothesis to test is that the early-life SEP has no impact on their biological markers.
+
+The first step is to calculate the average biological markers by the individuals, in each category of the variable 'SEP'. 
+
+#chance cronological age from factor to numeric vector
+dfbioage$age    <- as.numeric(as.factor(dfbioage$age))
+
+```{r}
+aggregate(kdm~Class,data,mean)
+aggregate(kdm_advance~Class,data,mean)
+aggregate(hd~Class,data,mean)
+aggregate(hd_log~Class,data,mean)
+aggregate(age~Class,data,mean)
+```
+
+The next step is to calculate the standard deviation of biological age levels within each group.
+
+```{r}
+#High-risk group of ACES
+aggregate(kdm~Class,data,sd)
+aggregate(kdm_advance~Class,data,sd)
+aggregate(hd~Class,data,sd)
+aggregate(hd_log~Class,data,sd)
+aggregate(age~Class,data,sd)
+```
+SD biomarkers
+```{r}
+#High-risk group of ACES
+aggregate(ldl~childhood_sep,dfbioage1,sd)
+aggregate(hdl~childhood_sep,dfbioage1,sd)
+aggregate(tchol~childhood_sep,dfbioage1,sd)
+aggregate(glucose~childhood_sep,dfbioage1,sd)
+aggregate(trig~childhood_sep,dfbioage1,sd)
+aggregate(hba1c~childhood_sep,dfbioage1,sd)
+aggregate(bmi_2~childhood_sep,dfbioage1,sd)
+aggregate(wc~childhood_sep,dfbioage1,sd)
+aggregate(sbp~childhood_sep,dfbioage1,sd)
+aggregate(dbp~childhood_sep,dfbioage1,sd)
+
+```
+
+
+
+The standard deviation is calculated to test if the assumptions of ANOVA is satisfied or not. Standard deviation in both groups to the five BA are quite similar for high-risk groups. The final step is to run the ‘anova’ test and print the summary result.
+
+```{r}
+anova_1 = aov(dfbioage$kdm0~dfbioage$Class + dfbioage$sex + dfbioage$race)
+summary(anova_1)
+```
+Interpretation of the output: The SD is 10.57130	for low risk group. Since the p-value of 0.000169 is less than 0.05, we reject the null hypothesis that there is no impact on the childhood adversity of the individuals, basis their KDM biological age.
+
+This shows very strong evidence against the null hypothesis in favour of the alternative: ACE is significant with KDM BA.
+
+```{r}
+anova_2 = aov(dfbioage$kdm_advance0 ~ dfbioage$Class + dfbioage$sex + dfbioage$race)
+summary(anova_2)
+```
+Interpretation of the output: This shows moderate evidence against the null hypothesis in favour of the alternative: ACE is significant with KDM BA.
+
+
+```{r}
+anova_3 = aov(dfbioage$hd ~ dfbioage$Class + dfbioage$sex + dfbioage$race)
+summary(anova_3)
+```
+Interpretation of the output: No significant. The p-value is greater than 0.1. This shows absent of evidence against the null hypothesis: data consistent with the null hypothesis (childhood adversity is not significant with homeostatic dysregulation)
+
+
+```{r}
+anova_4 = aov(dfbioage$raw_dist~dfbioage$Class +dfbioage$sex++dfbioage$race)
+summary(anova_4)
+```
+Interpretation of the output: No significant.
+
+
+```{r}
+anova_5 = aov(dfbioage$age~dfbioage$Class +dfbioage$sex++dfbioage$race)
+summary(anova_5)
+```
+
+Interpretation of the output: Moderate evidence.
+
+Significant tests on differences of means among disease groups by one-way ANOVA
+```{r}
+anova_dis = aov(dfbioage$ldl~dfbioage$diabetes + dfbioage$hta + dfbioage$cvd)
+summary(anova_dis)
+```
+
+
+
+```{r}
+anova_ca = aov(dfbioage$ldl~dfbioage$age)
+anova_ca1 = aov(dfbioage$hdl~dfbioage$age)
+anova_ca2 = aov(dfbioage$tchol~dfbioage$age)
+anova_ca3 = aov(dfbioage$hba1c~dfbioage$age)
+anova_ca4 = aov(dfbioage$glucose~dfbioage$age)
+anova_ca5 = aov(dfbioage$trig~dfbioage$age)
+anova_ca6 = aov(dfbioage$wc~dfbioage$age)
+anova_ca7 = aov(dfbioage$bmi_2~dfbioage$age)
+anova_ca8 = aov(dfbioage$sbp~dfbioage$age)
+anova_ca9 = aov(dfbioage$dbp~dfbioage$age)
+
+summary(anova_ca)
+summary(anova_ca1)
+summary(anova_ca2)
+summary(anova_ca3)
+summary(anova_ca4)
+summary(anova_ca5)
+summary(anova_ca6)
+summary(anova_ca7)
+summary(anova_ca8)
+summary(anova_ca9)
+```
+
+```{r}
+Desc(dfbioage$cvd)
+```
+
+
+```{r}
+#Childhood SEP means
+aggregate(kdm~childhood_sep,data,mean)
+aggregate(kdm_advance~childhood_sep,data,mean)
+aggregate(hd~childhood_sep,data,mean)
+aggregate(hd_log~childhood_sep,data,mean)
+aggregate(age~childhood_sep,data,mean)
+
+#SD
+aggregate(kdm~childhood_sep,data,sd)
+aggregate(kdm_advance~childhood_sep,data,sd)
+aggregate(hd~childhood_sep,data,sd)
+aggregate(hd_log~childhood_sep,data,sd)
+aggregate(age~childhood_sep,data,sd)
+```
+
+Check levels of diseases YES/NO
+
+```{r}
+#Rename values in the health outcomes columns and create a vectors of diseases
+dfbioage$cvd <- factor(dfbioage$cvd,
+                levels = c("1","2","8","9"),
+                labels = c("si","no", "no","no"))
+                
+dfbioage$hta <- factor(dfbioage$hta,
+                levels = c("1","2","8","9"),
+                labels = c("si","no", "no","no"))
+                
+dfbioage$diabetes <- factor(dfbioage$diabetes,
+                levels = c("1","2","8","9"),
+                labels = c("si","no", "no","no"))
+```
+
+
+ANOVA biomarkers vs diseases and CA
+```{r}
+#hta means
+aggregate(ldl~cvd,dfbioage,mean)
+aggregate(hdl~cvd,dfbioage,mean)
+aggregate(tchol~cvd,dfbioage,mean)
+aggregate(glucose~cvd,dfbioage,mean)
+aggregate(hba1c~cvd,dfbioage,mean)
+aggregate(trig~cvd,dfbioage,mean)
+aggregate(bmi_2~cvd,dfbioage,mean)
+aggregate(wc~cvd,dfbioage,mean)
+aggregate(sbp~cvd,dfbioage,mean)
+aggregate(dbp~cvd,dfbioage,mean)
+aggregate(age~cvd,dfbioage,mean)
+
+#SD
+aggregate(ldl~cvd,dfbioage,sd)
+aggregate(hdl~cvd,dfbioage,sd)
+aggregate(tchol~cvd,dfbioage,sd)
+aggregate(glucose~cvd,dfbioage,sd)
+aggregate(hba1c~cvd,dfbioage,sd)
+aggregate(trig~cvd,dfbioage,sd)
+aggregate(bmi_2~cvd,dfbioage,sd)
+aggregate(wc~cvd,dfbioage,sd)
+aggregate(sbp~cvd,dfbioage,sd)
+aggregate(dbp~cvd,dfbioage,sd)
+aggregate(age~cvd,dfbioage,sd)
+```
+
+
+
+```{r}
+#Anova childhood SEP
+anova_6 = aov(dfbioage$kdm0~dfbioage$childhood_sep+dfbioage$sex++dfbioage$race)
+summary(anova_6)
+```
+Interpretation of the output: Significant. Since the p-value <0.001, we reject the null hypothesis that there is no impact on the childhood SEP of the individuals, basis their KDM biological age.
+
+This shows very strong evidence against the null hypothesis in favour of the alternative: childhood SEP is significant with KDM BA.
+
+```{r}
+anova_7 = aov(dfbioage$kdm_advance0~dfbioage$childhood_sep+dfbioage$sex++dfbioage$race)
+summary(anova_7)
+```
+Interpretation of the output: No significant.
+
+```{r}
+anova_8 = aov(dfbioage$hd~dfbioage$childhood_sep+dfbioage$sex+dfbioage$race)
+summary(anova_8)
+```
+Interpretation of the output: No significant.
+
+```{r}
+anova_10 = aov(dfbioage$raw_dist~dfbioage$childhood_sep+dfbioage$sex+dfbioage$race)
+summary(anova_10)
+```
+Interpretation of the output: No significant.
+
+```{r}
+anova_11 = aov(dfbioage$age~dfbioage$childhood_sep+dfbioage$sex++dfbioage$race)
+summary(anova_11)
+```
+Interpretation of the output: Significant. Since the p-value <0.001, we reject the null hypothesis that there is no impact on the childhood SEP of the individuals, basis their cronological age.
+
+This shows very strong evidence against the null hypothesis in favour of the alternative: childhood SEP is significant with cronological age.
+
+The results were significant in childhood adversity and BA (anova 1), childhood adversity-BA1 (anova 2), childhood adversity-CA (anova 5), childhood SEP-BA (anova 6), and childhood SEP-CA (anova 11), we run the post-hoc test  to understand the differences in the group (SEP groups) means.
+
+```{r}
+TukeyHSD(anova_dis)
+TukeyHSD(anova_2)
+TukeyHSD(anova_5)
+TukeyHSD(anova_11)
+```
+Interpretation: The p-values are greater than 0.05 in anova 2 (ACE-BA1) suggests that the variations in the biological age of the individuals, based on their childhood adversity, is not significant.
+
+
+#ANOVA to check differences between means
+disease = c("diabetes", "hta", "cvd")
+
+```{r}
+#Anova cLDL vs diseases groups
+anova_test = aov(dfbioage$wc ~ dfbioage$diabetes + dfbioage$hta + dfbioage$cvd)
+summary(anova_test)
+```
+
+
+
+Analysis of variance - ANOVA tables
+
+```{r}
+library(knitr) #use kable function
+str(dfbioage) # check out the structure of the data
+
+```
+
+Pearson coeeficents BA, biomarkers and childhood SEP
+```{r}
+correlation <- cor(dfbioage1$kdm0, dfbioage1$ldl, method = 'pearson')
+correlation
+```
+
+
+
+We run a 2x3 factorial ANOVA to test if there are differences in the biological markers based on the childhood adversity group and childhood SEP. 
+
+
+Test scatter plot
+```{r}
+plot(data$age, data$kdm_advance,xlab="cronological age",ylab="Biological age methods",pch=3) 
+```
+
+
+
+Matrix correlation with biological markers
+```{r}
+#select biological markers variables
+agevar = c("kdm","kdm_advance","hd","hd_log","hdl","ldl","glucose","totchol","trig","hba1c", "sbp","dbp","waist","bmi" )
+
+#prepare lables
+#values should be formatted for displaying along diagonal of the plot
+#names should be used to match variables and order is preserved
+label = c(
+  "kdm"="KDM",
+  "kdm_advance"="KDM V2",
+  "hd" = "HD",
+  "hd_log" = "HD Log",
+  "ldl"="ldl\nldl",
+  "hdl"="hdl\nhdl",
+  "glucose"="glucose\nglucose",
+  "totchol"="tchol\ntchol",
+  "trig"= "trig\ntrig",
+  "hba1c"="sbp\nsbp",
+  "waist"="wc\nwc",
+  "bmi"="bmi\nbmi")
+
+#use variable name to define the axis type ("int" or "float")
+axis_type = c(
+  "kdm"="float",
+  "kdm_advance"="float",
+  "hd"="flot",
+  "hd_log"="float",
+  "ldl"="float",
+  "hdl"="float",
+  "glucose"="float",
+  "totchol"="float",
+  "trig"= "float",
+  "hba1c"="float",
+  "waist"="float",
+  "bmi"="float")
+
+#plot BAA corplot
+plot_baa(data=data,agevar,label,axis_type)
+```
+
+
+
+
+
+FIN
+
+Alternative methods for Hypothesis testing continuos variables##
+
+Hypothesis testing procedure
+
+1 Propose a research question
+2 Formulate the null hypothesis H0 and alternative hypothesis H1
+3 Choose an appropriate statistical test
+4 Choose an appropriate significance level, α
+5 Calculate the test statistic
+6 Calculate the p-value
+7 Reject H0 if p < α
+
+
+#1 Propose a research question
+
+We have four research questions to test in SABE aging survey: 
+a) Are adult chronic diseases affected by childhood inequality? 
+b) Are SEP embodied in the cardiometabolic system? 
+c) To what extend the association between biological age and cardiometabolic conditions are explained by education? 
+d) Are biological age differentials driven by other variables?
+
+#2 Formulate the null hypothesis H0 and alternative hypothesis H1
+
+Null hypothesis 1:  there is no association between childhood SEP and adult health outcomes. 
+Null hypothesis 2:  there is no association between lower educational attainment, adult biomarkers, and cardiometabolic conditions.
+
+The null hypothesis H0 and alternative hypothesis H1 are always two rival hypothesis:
+H0: μ = 0   The two variables childhood SEP and adult health are independent of each other.
+H1: μ ̸= 0  The two variables are related to each other.
+
+#3 Choose an appropriate statistical test
+
+Two-tailed test: H0: μ = 0, H1: μ ̸= 0
+
+
+#4 Choose an appropriate significance level, α
+
+For z-test with a given significance level α = 0.05, H0 is rejected when P(|X| > zα/2) < α/2, where zα/2 = 1.96
+
+#5 Calculate the test statistic
+
+```{r}
+#Sampling | Confidence intervals
+set_plot_dimensions <- function(width_choice, height_choice) {
+    options(repr.plot.width=width_choice, repr.plot.height=height_choice)
+}
+```
+
+
+Standard normal distribution
+Consider a normal distribution with mean 0 and standard deviation 1:𝑍∼𝑁(0,1)
+
+Z is known as the standard normal distribution.
+
+```{r}
+# a standard normal distribution
+mu <- 9.692234
+sigma <- 2812
+```
+
+```{r}
+## plot the probability density function
+wid <- 0.01
+x <- seq(-40,60,wid)
+pdf <- dnorm(x,mu,sigma)
+
+set_plot_dimensions(5, 4)
+plot(x, pdf, xlab="x", type="l", col="red")
+```
+
+```{r}
+alpha <- 0.1  # how much probability will remain in the tails
+
+qnorm(alpha/2,mu,sigma)  # the critical value for the lower tail
+qnorm(1-alpha/2,mu,sigma) # the critical value for the upper tail = z90
+```
+
+
+```{r}
+# plot the cumulative distribution function
+
+cdf <- pnorm(x,mu,sigma)
+
+set_plot_dimensions(5, 4)
+plot(x, cdf, xlab="x", ylim=c(0,1), type="l", col="blue")
+```
+
+
+```{r}
+# plot the probability density function
+plot(x, pdf, xlab="x", type="l", col="red")
+
+# the shaded region contains 90% of the probability mass
+z90 <- qnorm(1-alpha/2,mu,sigma)
+x_region = seq(-z90,z90,wid)
+polygon(c(x_region,z90,-z90), c(dnorm(x_region,mu,sigma),0,0), border=NA, col="lightgrey")
+```
+
+```{r}
+#Find the corresponding critical values for 95% and 99% of the probability mass.
+
+#95%
+qnorm(1-0.05/2,mu,sigma)
+
+#99%
+qnorm(1-0.01/2,mu,sigma)
+```
+
+Based on aces data, calculate a 95% confidence interval for the speed of light.
+```{r}
+# first, calculate the sample mean and s.d.
+xbar  <- mean(corr_ba$kdm0)
+xbar
+s  <- sd(corr_ba$kdm0)  ## sd() uses the unbiased estimator
+s
+
+xbar1 <- mean(corr_ba$kdm_advance0)
+xbar1
+s1 <- sd(corr_ba$kdm_advance0)  ## sd() uses the unbiased estimator
+s1
+
+xbar2 <- mean(corr_ba$hd)
+xbar2
+s2 <- sd(corr_ba$hd)  ## sd() uses the unbiased estimator
+s2
+
+xbar3 <- mean(corr_ba$raw_dist)
+xbar3
+s3 <- sd(corr_ba$raw_dist)  ## sd() uses the unbiased estimator
+s3
+
+```
+
+```{r}
+# now find the critical value
+z95 <- qnorm(1-0.05/2,mu,sigma)
+z95
+```
+
+```{r}
+# finally calculate the 95% confidence interval for mu
+ci <- c(xbar - z95 * s / sqrt(2812) , xbar + z95 * s / sqrt(2812))
+ci
+
+ci1 <- c(xbar1 - z95 * s1 / sqrt(2812) , xbar1 + z95 * s1 / sqrt(2812))
+ci1
+
+ci2 <- c(xbar2 - z95 * s2 / sqrt(2812) , xbar2 + z95 * s2 / sqrt(2812))
+ci2
+
+ci3 <- c(xbar3 - z95 * s3 / sqrt(2812) , xbar3 + z95 * s3 / sqrt(2812))
+ci3
+```
+
+Use Student's t-distribution to construct an appropriate confidence interval. This has a broader bell-curve, which reflects our lack of knowledge about the population variance.
+
+The t-distribution takes a single parameter, which is  𝜈, the number of degrees of freedom. We set this as  𝑛−1
+For high values of  𝜈 the t-distribution converges to the normal distribution.
+
+```{r}
+x <- seq(-4,4,0.01)
+plot(x,dnorm(x,mean=0,sd=1), xlab="x", type="l", col='grey')
+lines(x, dt(x, df=1), col="red")
+```
+
+
+```{r}
+# now find the critical value
+t95 <- qt(1-0.05/2,df=2811)  # df = n-1
+t95
+```
+
+```{r}
+# finally calculate the 95% confidence interval for mu
+ci <- c(xbar - t95 * s / sqrt(2812) , xbar + t95 * s / sqrt(2812))
+ci
+
+ci1 <- c(xbar1 - t95 * s1 / sqrt(2812) , xbar1 + t95 * s1 / sqrt(2812))
+ci1
+
+ci2 <- c(xbar2 - t95 * s2 / sqrt(2812) , xbar2 + t95 * s2 / sqrt(2812))
+ci2
+
+ci3 <- c(xbar3 - t95 * s3 / sqrt(2812) , xbar3 + t95 * s3 / sqrt(2812))
+ci3
+```
+
+Matrix correlation biomarkers
+```{r}
+matrix_ba<-correlation(corr_ba[-2], method = "pearson")
+#Correlation Matrix (pearson-method)
+
+matrix_ba
+save(matrix_ba, file = "matrix_ba")
+```
+
+
+Final matrix correlation SEP + BA =+ disease
+```{r}
+matrix_corr<-correlation(corr[-2], method = "pearson")
+#Correlation Matrix (pearson-method)
+matrix_corr
+```
+
+
+
+```{r}
+results <- correlation(corr_aces)
+results
+# Correlation Matrix (pearson-method)
+```
+
+summary(results)
+#Correlation Matrix (pearson-method)
+
+
+```{r}
+summary(results, redundant = TRUE)
+# Correlation Matrix (pearson-method)
+```
+
+
+
+
