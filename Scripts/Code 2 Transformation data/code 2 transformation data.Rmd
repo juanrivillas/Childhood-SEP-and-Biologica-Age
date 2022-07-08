@@ -15,6 +15,7 @@ output:
 ## Contents Code 2: Data processing and preparation for analysis.
 
 Two main steps are described in this markdown. 
+Merging datasets: imputation + clusters + SEP data
 
 **Step 1. Preparing work space (import imputed data)**. This step includes:
         1.1. Working directory and loading of packages required for the tidying data.
@@ -43,8 +44,10 @@ setwd("/Users/macbookpro/Documents/PhD Project/Data/SABE/Markdowns")
 Install CRAN packages and install the relevant libraries. This code chunk shows the loading of packages required for the analyses.
 install.packages: dplyr, ggplot2, vcdExtra,epiDisplay, data.table, formattable, table1, haven, devtools, DescTools.
 
+install.packages ("DescTools")
+
 ```{r eval=FALSE, include=FALSE}
-install.packages (c("dplyr", "ggplot2", "vcdExtra","epiDisplay", "data.table", "formattable", "table1", "haven", "devtools", "DescTools"))
+install.packages (c("dplyr", "ggplot2", "vcdExtra","epiDisplay", "data.table", "formattable", "table1", "haven", "devtools", "DescTools", "compareGroups"))
 ```
 Loading the relevant libraries into the work space to tidying and transformation data.
 library(tidyverse)  #Tidy data and transformation
@@ -55,6 +58,9 @@ library(table1)     #to Create HTML Tables of Descriptive Statistics in epi
 library("ggplot2")  #improved plots and bar charts
 library(haven)
 library(devtools)
+library(compareGroups)
+
+install.packages("compareGroups")
 
 ```{r}
 library(tidyverse)  #Tidy data and transformation
@@ -65,17 +71,43 @@ library(table1)     #to Create HTML Tables of Descriptive Statistics in epi
 library("ggplot2")  #improved plots and bar charts
 library(haven)
 library(devtools)
+library(compareGroups)
 ```
 
-**1.2. Importing of imputed SABE data base (Loading data EXCEL files)**.
+**1.2. Importing of imputed SABE data bases (Loading data EXCEL files)**.
 
 ```{r}
 library(readxl)
-biomarkers.imp <- read_excel("~/Documents/PhD Project/Data/SABE/Dataframes/biomarkers.imp.xlsx")
+dfimputed <- read_excel("~/Documents/PhD Project/Data/SABE/Dataframes/dfimputed.xlsx")
+dfcluster <- read_excel("~/Documents/PhD Project/Data/SABE/Dataframes/dfcluster.xlsx")
+
+SABE_Colombia <- read_excel("~/Documents/PhD Project/Data/SABE/Dataframes/SABE_Colombia.xlsx")
+newdata <- SABE_Colombia[ which(SABE_Colombia$biomarkers=='1'), ]
 ```
 
-Another option for CSV files:
-biomarkers.imp <- read_csv("biomarkers.imp.csv")
+
+Selection of 15 sociodemographic, socioeconomic, and health outcomes variables present in the data.
+```{r}
+myvars <- c("ID","sex", "age","current_sep","educational_level", "health_insurance", "cash_transfer1","cash_transfer2", "cvd", "hta", "diabetes","alcohol","smoking", "migration_yo")
+```
+
+**1.5. Verifying upload and exploring individual socioeconomic and biomarker data**.
+
+```{r}
+biomarkers <- newdata[myvars]
+```
+
+
+```{r}
+# merge two data frames by ID (cluster and imputation)
+total <- merge(dfimputed, dfcluster, by="ID")
+view(total)
+
+# merge two data frames by ID (total and biomarkers)
+biomarkers.imp <- merge(biomarkers, total, by="ID")
+view(biomarkers.imp)
+```
+
 
 **1.3. Verifying upload and exploring imputed data base**.
 Get and overview of the data (types and dimensions of observations and columns). We already did this in Code 1 at the end, but for quality control: inspect the variables, the total number of observations, a full list of the variables names, the data type of each variable, the first few observation for each variable, and dimension of data.
@@ -90,6 +122,10 @@ tail(biomarkers.imp, n=20) #Print out last observations in data frame
 Data summary: names columns, number of observations, n missing values, completed rates, and type of data (caracter or numeric)
 ```{r }
 skimr::skim(biomarkers.imp)
+skimr::skim(dfimputed)
+skimr::skim(total)
+skimr::skim(biomarkers)
+
 ```
 
 
@@ -100,7 +136,7 @@ Note: original SABE database is a “tidy” dataset: each column is a variable,
 **2.1. Vector transformation and computing frequency tables**. Start by converting into a tibble data frame (biomarkers), assigning column labels in the data, and computing frequency tables (mainly demographics, SEP variables, and health outcomes).
 
 **Sociodemographic data**
-There are four demographics characteristics variables: sex, age, ethnic groups, and area of residence.
+There are four demographics characteristics variables: sex, ethnic groups, and area of residence.
 
 Sex
 ```{r}
@@ -109,35 +145,17 @@ biomarkers.imp$sex <- factor(biomarkers.imp$sex,
                 labels = c("male", "female"))
 
 #Desc(biomarkers.imp$sex)
-#Freq(biomarkers.imp$sex) 
-```
-
-Age: to create vector age groups.
-```{r }
-biomarkers.imp$age_group <- cut( x = biomarkers.imp$age, breaks = c(60, 70, 80, Inf))
-
-table(biomarkers.imp$age_group)
-
-#Desc(biomarkers.imp$age_group)
-#Freq(biomarkers.imp$age_group, useNA = "always")
-```
-
-Verify that each age value was assigned to the correct category by cross-tabulating the numeric and category columns. 
-Cross tabulation of the numeric and category columns. 
-```{r }
-table("Numeric Values" = biomarkers.imp$age,   # names specified in table for clarity.
-      "Categories"     = biomarkers.imp$age_group,
-      useNA = "always")                        # don't forget to examine NA values
+Freq(biomarkers.imp$sex) 
 ```
 
 Ethnic group: Seven ethnic groups regrouped into five main groups according to race and ethnic classification in Colombia.
 ```{r} 
 biomarkers.imp$ethnic_group <- factor(biomarkers.imp$ethnic_group,
                 levels = c("1","2","3","4","5","7","8","9"),
-                labels = c("indigenous", "afrocolombian","afrocolombian","white","mestize","mestize","Not reply/Don't know", "Not reply/Don't know"))
+                labels = c("indigenous", "afrocolombian","afrocolombian","white","mestize","mestize","other", "other"))
 
 #Desc(biomarkers.imp$ethnic_group)
-#Freq(biomarkers.imp$ethnic_group, useNA = "always")
+Freq(biomarkers.imp$ethnic_group, useNA = "always")
 ```
 
 Area of residence regrouped into two main groups.
@@ -147,7 +165,7 @@ biomarkers.imp$area_residence <- factor(biomarkers.imp$area_residence,
                 labels = c("urban", "rural","rural"))
 
 #Desc(biomarkers.imp$area_residence)
-#Freq(biomarkers.imp$area_residence)
+Freq(biomarkers.imp$area_residence)
 ```
 
 Summary demographic characteristics by sex.
@@ -157,30 +175,17 @@ table_1<- table1(~age_group + ethnic_group + area_residence| sex, data=biomarker
 table_1
 ```
 
-
 **Socioeconomic position data**.
 
-There are five socioeconomic position variables: 
+There are four socioeconomic position variables: 
 
-Two of early-life SEP variables: i) family SEP and ii) Adverse Childhood Experiences ACEs.
+One of early-life SEP variable: i) Adverse Childhood Experiences ACEs.
 Three of current SEP variables: i)  current SEP, ii) occupation status, and iii) educational level.
 
 An ordered factor with the categories of early-life and current socioeconomic position was created to deal with the natural ordering (Except for ACEs, which are unordered and it is described below).
 
 levels: a) Low  b) Intermediate  c) High
 
-Family socioeconomic position (reported before 15 year old).
-
-```{r}
-biomarkers.imp$family_sep <- factor(biomarkers.imp$family_sep,
-                levels = c("1","2","3","8","9"),
-                labels = c("high", "intermediate","low","Not reply/Don't know","Not reply/Don't know"))
-
-#compute frequency tables
-#Desc(biomarkers.imp$family_sep)
-#Freq(biomarkers.imp$family_sep, useNA = "always")
-
-```   
 
 Current socioeconomic position regrouped from five into three main categories.
 ```{r current sep}
@@ -199,9 +204,11 @@ a) Non manual   b) Skilled manual  c) Semi-skilled manual
 biomarkers.imp$sep_occupation <- factor(biomarkers.imp$sep_occupation,
                 levels = c("1","2","3","4","5","6","7","8","9","77","98","99"),
                 labels = c("skilled manual","skilled manual","semi-skilled","non-manual","semi-skilled",
-                "non-manual","non-manual","skilled manual","semi-skilled","non-manual","Not reply/Don't know","Not reply/Don't know"))
+                "non-manual","non-manual","skilled manual","semi-skilled","non-manual","semi-skilled","semi-skilled"))
 
-#Desc(biomarkers.imp$sep_occupation)
+Desc(biomarkers.imp$sep_occupation)
+Freq(biomarkers.imp$sep_occupation, useNA = "always")
+
 ```
 
 **Adverse Childhood Experiences ACEs data**
@@ -211,34 +218,34 @@ Early-life infection. Column creation, transformation data and compute frequency
 ```{r }
 biomarkers.imp$CKD <- factor(biomarkers.imp$early_infection1,
                 levels = c("1","2","8","9"),
-                labels = c("1","0", "Not reply/Don't know","Not reply/Don't know"))
+                labels = c("1","0", "0","0"))
 
 biomarkers.imp$viral.hepatitis <- factor(biomarkers.imp$early_infection2,
                 levels = c("1","2","8","9"),
-                labels = c("1","0", "Not reply/Don't know","Not reply/Don't know"))                
+                labels = c("1","0", "0","0"))                
 
 biomarkers.imp$measles <- factor(biomarkers.imp$early_infection3,
                 levels = c("1","2","8","9"),
-                labels = c("1","0", "Not reply/Don't know","Not reply/Don't know"))
+                labels = c("1","0", "0","0"))
 
 biomarkers.imp$rheumatic.fever <- factor(biomarkers.imp$early_infection4,
                 levels = c("1","2","8","9"),
-                labels = c("1","0", "Not reply/Don't know","Not reply/Don't know"))
+                labels = c("1","0", "0","0"))
 
 biomarkers.imp$TB <- factor(biomarkers.imp$early_infection5,
                 levels = c("1","2","8","9"),
-                labels = c("1","0", "Not reply/Don't know","Not reply/Don't know")) 
+                labels = c("1","0", "0","0")) 
 
 biomarkers.imp$asthma <- factor(biomarkers.imp$early_infection6,
                 levels = c("1","2","8","9"),
-                labels = c("1","0", "Not reply/Don't know","Not reply/Don't know"))                
+                labels = c("1","0", "0","0"))                
 
 biomarkers.imp$bronchitis <- factor(biomarkers.imp$early_infection7,
                 levels = c("1","2","8","9"),
-                labels = c("1","0", "Not reply/Don't know","Not reply/Don't know"))
+                labels = c("1","0", "0","0"))
 
-#Desc(biomarkers.imp$bronchitis)
-#Freq(biomarkers.imp$bronchitis, useNA = "always")
+Desc(biomarkers.imp$CKD)
+Freq(biomarkers.imp$CKD, useNA = "always")
 ```
 
 Create a new combination of vectors not present in the data (early-life infection).
@@ -257,13 +264,13 @@ biomarkers.imp$bronchitis      <- as.numeric(as.character(biomarkers.imp$bronchi
 biomarkers.imp$early_infection <- biomarkers.imp$CKD + biomarkers.imp$viral.hepatitis + biomarkers.imp$measles + 
 biomarkers.imp$TB + biomarkers.imp$rheumatic.fever + biomarkers.imp$asthma + biomarkers.imp$bronchitis  
 
-Freq(biomarkers.imp$early_infection, useNA = "always")
 
 biomarkers.imp$early_infection <- factor(biomarkers.imp$early_infection,
                 levels = c("0","1","2","3","4","5","6","7"),
                 labels = c("0","1","1","1","1","1","1","1"))
 
 Desc(biomarkers.imp$early_infection)
+Freq(biomarkers.imp$early_infection, useNA = "always")
 
 class(biomarkers.imp$early_infection)
 class(biomarkers.imp$TB)
@@ -307,6 +314,7 @@ table_3
 
 ```
 
+Now, there are five childhood experiences variables (emotional abuse, migration, household violence, neglect food, poor health) and new variable created from present data (new variable). First step, vector transformation of emotional abuse YES/NOT as numerical values and convert them into characters. Second step rename levels in the aces columns as factors.
 
 Poor health. Vector transformation of "poor health" reported during the first 15 years of life. Question 804: were you in bed for a month or more due to any health problem?
 
@@ -315,30 +323,15 @@ biomarkers.imp$poor_health2 <- factor(biomarkers.imp$poor_health2,
                 levels = c("1","2","8","9"),
                 labels = c("1","0","0","0"))
 
-Desc (biomarkers.imp$poor_health2)
-```
-
-Now, there are five childhood experiences variables (emotional abuse, migration, household violence, neglect food, poor health) and new variable created from present data (new variable). First step, vector transformation of emotional abuse YES/NOT as numerical values and convert them into characters. Second step rename levels in the aces columns as factors.
-
-```{r }
 biomarkers.imp$emotional_abuse <- factor(biomarkers.imp$emotional_abuse,
                 levels = c("1","2","3","4","8","9"),
                 labels = c("1","1","1","0","0","0"))
 
-Desc(biomarkers.imp$emotional_abuse)
-
-biomarkers.imp$migration <- factor(biomarkers.imp$migration,
-                levels = c("1","2","8","9"),
-                labels = c("1","0", "0","0"))
-
-Desc(biomarkers.imp$migration)
+biomarkers.imp$migration_yo2 <- ifelse(test = biomarkers.imp$migration_yo %in% c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15), yes = 1, no =0)
 
 biomarkers.imp$neglected_food <- factor(biomarkers.imp$neglected_food,
                 levels = c("1","2","8","9"),
                 labels = c("1","0", "0","0"))
-
-Desc(biomarkers.imp$neglected_food)
-Freq(biomarkers.imp$neglected_food, useNA = "always")
 
 biomarkers.imp$household_violence <- factor(biomarkers.imp$household_violence,
                 levels = c("1","2","8","9"),
@@ -346,51 +339,100 @@ biomarkers.imp$household_violence <- factor(biomarkers.imp$household_violence,
 
 #compute frequency tables
 Desc(biomarkers.imp$household_violence)
+Desc(biomarkers.imp$emotional_abuse)
+Desc(biomarkers.imp$neglected_food)
+Freq(biomarkers.imp$migration_yo2)
+Freq(biomarkers.imp$neglected_food)
+Freq(biomarkers.imp$early_infection)
+Freq(biomarkers.imp$emotional_abuse)
 ```
 
-Then, we create new combination of vectors not present in the data (adverse childhood experiences). First step, it is calculate a new variable called aces (sum of six exposures reported). Second step, it was recoded into three main categories. 
 
-Levels: a) none  b) one or two  c) three  d) four or more adverse childhood exposures
+
+Create new combination of vectors not present in the data (dimensions of ACEs).
+formula: 
+
+Abuse = household violence + emotional abuse. 
+Neglected = poor health + early-life infection + neglected food
+Household dysfunction = family_sep + migration
+
+This was recoded into three main levels: 
 
 ```{r}
-#class(biomarkers.imp$early_infection)
-#class(biomarkers.imp$migration)
-#class(biomarkers.imp$emotional_abuse)
-#class(biomarkers.imp$early_infection)
-
+# Multiple conditions to adding new column to data frame:
 #To explicitly coerce objects from one class to another
-biomarkers.imp$neglected_food     <- as.numeric(as.character(biomarkers.imp$neglected_food))
-biomarkers.imp$household_violence <- as.numeric(as.character(biomarkers.imp$household_violence))
-biomarkers.imp$migration          <- as.numeric(as.character(biomarkers.imp$migration))
-biomarkers.imp$emotional_abuse    <- as.numeric(as.character(biomarkers.imp$emotional_abuse))
+
+Desc(biomarkers.imp$early_infection)
+Freq(biomarkers.imp$early_infection, useNA = "always")
+
+mytable <- table(biomarkers.imp$early_infection, biomarkers.imp$sex)
+mytable
+
+class(biomarkers.imp$early_infection)
+class(biomarkers.imp$poor_health2)
+
+biomarkers.imp$early_infection    <- as.numeric(as.factor(biomarkers.imp$early_infection))
 biomarkers.imp$poor_health2       <- as.numeric(as.character(biomarkers.imp$poor_health2))
-biomarkers.imp$early_infection    <- as.numeric(as.character(biomarkers.imp$early_infection))
 
-biomarkers.imp$acesum <- biomarkers.imp$neglected_food + biomarkers.imp$household_violence + biomarkers.imp$migration + biomarkers.imp$emotional_abuse + biomarkers.imp$poor_health2 + biomarkers.imp$early_infection   
 
-biomarkers.imp$acesum <- factor(biomarkers.imp$acesum,
-                levels = c("1","2","3","4","5","6"),
-                labels = c("one or two", "one or two", "three","four or more", "four or more", "four or more"))
+biomarkers.imp$poor_health3  <- biomarkers.imp$poor_health2 + biomarkers.imp$early_infection
+mytable <- table(biomarkers.imp$poor_health3, biomarkers.imp$sex)
+mytable
 
-#compute frequency tables
-Desc(biomarkers.imp$acesum)
+Freq(biomarkers.imp$poor_health3,useNA = "always")
+
+biomarkers.imp$poor_health3 <- factor(biomarkers.imp$poor_health3,
+                levels = c("2","3","4"),
+                labels = c("0","1","1"))
+
+Freq(biomarkers.imp$poor_health3)
+class(biomarkers.imp$poor_health3)
+
 ```
 
-Summary childhood experiences of study population by sex and age groups.
 
-```{r Table 4. Description Adverse Childhood Experiences by sex and age groups}
+```{r}
+#Dimension 1: Abuse
+biomarkers.imp$emotional_abuse    <- as.numeric(as.character(biomarkers.imp$emotional_abuse))
 
-biomarkers.imp$neglected_food     <- as.factor(as.numeric(biomarkers.imp$neglected_food))
-biomarkers.imp$household_violence <- as.factor(as.numeric(biomarkers.imp$household_violence))
-biomarkers.imp$migration          <- as.factor(as.numeric(biomarkers.imp$migration))
-biomarkers.imp$emotional_abuse    <- as.factor(as.numeric(biomarkers.imp$emotional_abuse))
-biomarkers.imp$poor_health2       <- as.factor(as.numeric(biomarkers.imp$poor_health2))
-biomarkers.imp$early_infection    <- as.factor(as.numeric(biomarkers.imp$early_infection))
+   
+#Dimension 2: Neglected
+biomarkers.imp$neglected_food     <- as.numeric(as.character(biomarkers.imp$neglected_food))
+biomarkers.imp$poor_health3        <- as.numeric(as.factor(biomarkers.imp$poor_health3))
 
-table_4 <-table1(~neglected_food + household_violence + migration + emotional_abuse + poor_health2 + early_infection + acesum| sex + age_group, data=biomarkers.imp)
 
-table_4
+#Dimension 3: Household dysfunction
+biomarkers.imp$migration          <- as.numeric(as.character(biomarkers.imp$migration))
+biomarkers.imp$household_violence <- as.numeric(as.character(biomarkers.imp$household_violence))
+
+
+biomarkers.imp$ace_abuse   <- biomarkers.imp$emotional_abuse 
+biomarkers.imp$ace_neglec  <- biomarkers.imp$neglected_food + biomarkers.imp$poor_health3
+biomarkers.imp$ace_dysfunc <- biomarkers.imp$migration + biomarkers.imp$household_violence
+
+
+#create a vector ace_abuse
+biomarkers.imp$ace_abuse <- factor(biomarkers.imp$ace_abuse,
+                levels = c("0","1"),
+                labels = c("low","high"))
+
+#create a vector ace_neglec
+biomarkers.imp$ace_neglec <- factor(biomarkers.imp$ace_neglec,
+                levels = c("1","2"),
+                labels = c("low","high"))
+
+
+biomarkers.imp$ace_dysfunc <- factor(biomarkers.imp$ace_dysfunc,
+                levels = c("1","2"),
+                labels = c("low","high"))
+
+
+
+Freq(biomarkers.imp$ace_neglec, useNA = "always")
+
+View(biomarkers.imp)
 ```
+
 
 Adverse childhood experiences by early-life SEP.
 
@@ -403,7 +445,7 @@ table_5
 Adverse childhood experiences by demographics characteristics (ethnicity).
 
 ```{r Table 6. Description of Adverse Childhood Experiences by ethnic groups}
-table_6 <-table1(~neglected_food + household_violence + migration + emotional_abuse + poor_health2 + early_infection + acesum| ethnic_group, data=biomarkers.imp)
+table_6 <-table1(~neglected_food + household_violence + migration + emotional_abuse + poor_health3 + early_infection + acesum| ethnic_group, data=biomarkers.imp)
 
 table_6
 ```
@@ -451,7 +493,369 @@ biomarkers.imp$nutrition_program <- factor(biomarkers.imp$cash_transfer1,
 Desc(biomarkers.imp$nutrition_program)
 ```
 
+**Health outcomes data**
+There are three variables reporting chronic diseases (cardiovascular disease, HTN, and diabetes), and 13 variables reporting medication. Here, we create a new combination of vectors (comorbidities and medication sum).
+
+Chronic conditions and medication by demographic characteristics (sex and age groups).
+
+```{r diseases}
+#Rename values in the health outcomes columns and create a vectors of diseases
+corr_aces$cvd <- factor(corr_aces$cvd,
+                levels = c("1","2","8","9"),
+                labels = c("si","no", "no","no"))
+                
+dfbioage$hta <- factor(dfbioage$hta,
+                levels = c("1","2","8","9"),
+                labels = c("si","no", "no","no"))
+                
+corr_aces$diabetes <- factor(corr_aces$diabetes,
+                levels = c("1","2","8","9"),
+                labels = c("si","no", "no","no"))
+                
+```
+
+Create new combination of vectors not present in the data (comorbidity or sum of three chronic conditions).
+formula: comorbidity = cvd + hta + diabetes. This was recoded into three main levels: a) none   b) one   c) two or more conditions 
+
+```{r}
+# Multiple conditions to adding new column to data frame:
+#To explicitly coerce objects from one class to another
+
+biomarkers.imp$hta      <- as.numeric(as.character(biomarkers.imp$hta))
+biomarkers.imp$diabetes <- as.numeric(as.character(biomarkers.imp$diabetes))
+biomarkers.imp$cvd      <- as.numeric(as.character(biomarkers.imp$cvd))
+```
+
+Body Mass Index (BMI): Create new combination of vectors (Body Mass Index BMI) not present in the data
+calculate Body Mass Index (BMI) through a function `bmi` that takes a person's weight in lbs and height in inches and returns their [Body Mass Index](https://www.nhs.uk/common-health-questions/lifestyle/what-is-the-body-mass-index-bmi/).
+
+formula: bmi =weight (kg) / height (m) x height (m)
+
+Levels: a) below 25 (normal)  b) between 25 - 30 (Overweight)  c) above 30 (Obese)
+
+```{r }
+biomarkers.imp$height_m     <- as.numeric(as.character(biomarkers.imp$hta))
+
+
+biomarkers.imp$height_m <- biomarkers.imp$height_2 / 100
+
+biomarkers.imp$height_m_squared <- (biomarkers.imp$height_m)^2
+
+biomarkers.imp$bmi_2 <- round(biomarkers.imp$weight_2 / (biomarkers.imp$height_m)^2, digits = 2 )
+
+biomarkers.imp$BMI <- cut( x = biomarkers.imp$bmi_2, breaks = c(0, 25, 30, Inf),
+                           levels = c("(0,25]", "(25.1,29.9]", "(30,Inf]"), 
+                           labels = c("below 25 normal", "25 and below 29.9 overweight","above 30 obese"))
+
+#Desc(biomarkers.imp$BMI)
+#Freq(biomarkers.imp$BMI, useNA = "always")
+```
+
+
+#Replace values between 460000 and 780000 (Do not apply) to NA values in bmi_2 column.
+```{r}
+biomarkers.imp$bmi_2 <- ifelse(test = biomarkers.imp$bmi_2 %in% c( 133.33, 178.52, 184.62, 2031.25, 217.29, 221.61, 311.11, 366.51, 1040000.00, 1120000.00, 300000.00, 310000.00, 340000.00, 360000.00, 380000.00, 400000.00, 420000.00, 430000.00, 440000.00, 450000.00, 460000.00, 480000.00, 490000.00, 500000.00, 510000.00, 520000.00, 530000.00, 540000,00, 550000.00, 560000.00, 570000.00, 580000.00, 590000.00, 
+600000.00, 610000.00, 620000.00, 630000.00, 640000.00, 650000.00, 660000.00, 670000.00, 680000.00, 690000.00, 700000.00, 740000.00, 750000.00, 720000.00, 730000.00, 760000.00, 780000.00, 470000.00, 770000.00, 710000.00, 960000.00, 790000.00, 800000.00, 810000.00, 820000.00, 830000.00, 840000.00, 850000.00, 860000.00, 870000.00, 880000.00, 890000.00, 900000.00, 910000.00, 920000.00, 930000.00, 940000.00, 950000.00, 970000.00, 980000.00, 990000.00, 197500.00, 1080000.00, 390000.00, 1010000.00, 1020000.00), yes = NA, no =  biomarkers.imp$bmi_2 )
+
+biomarkers.imp$obesity <- ifelse(test = biomarkers.imp$bmi_2 %in% c( "above 30 obese" ), yes = NA, no =  biomarkers.imp$bmi_2 )
+biomarkers.imp$obesity      <- as.numeric(as.character(biomarkers.imp$obesity))
+Desc(biomarkers.imp$obesity)
+```
+```
+
+
+```{r}
+
+biomarkers.imp$hta      <- as.numeric(as.character(biomarkers.imp$hta))
+biomarkers.imp$diabetes <- as.numeric(as.character(biomarkers.imp$diabetes))
+biomarkers.imp$cvd      <- as.numeric(as.character(biomarkers.imp$cvd))
+#biomarkers.imp$obesity  <- as.numeric(as.character(biomarkers.imp$obesity))
+
+#Freq(biomarkers.imp$obesity)
+
+#biomarkers.imp$obesity  <- ifelse(test = is.na(biomarkers.imp$obesity ) == "<30", yes = 1, no = 0 )
+
+
+biomarkers.imp$comorbidities <- biomarkers.imp$hta + biomarkers.imp$cvd + biomarkers.imp$diabetes
+
+class(biomarkers.imp$hta)
+class(biomarkers.imp$diabetes)
+class(biomarkers.imp$cvd)
+#class(biomarkers.imp$obesity)
+
+#create a vector co-morbidities
+biomarkers.imp$comorbidities <- factor(biomarkers.imp$comorbidities,
+                levels = c("0","1","2","3"),
+                labels = c("none","one", "two","three"))
+
+Desc(biomarkers.imp$hta)
+Desc(biomarkers.imp$cvd)
+Desc(biomarkers.imp$diabetes)
+Freq(biomarkers.imp$obesity)
+
+
+#mytable <- table(biomarkers.imp$obesity, biomarkers.imp$sex)
+#mytable
+
+Desc(biomarkers.imp$comorbidities)
+Freq(biomarkers.imp$comorbidities)
+```
+
+
+Vector transformation of medication. 
+There are 13 medication variables in the dataframe. Vector transformation only constrained seven first variables.
+medication_1
+
+```{r medicines}
+#To explicitly coerce objects from one class to another and vector transformation
+biomarkers.imp$medication_1  <- ifelse(test = is.na(biomarkers.imp$P835_1 ) == FALSE, yes = 1, no = 0 )
+biomarkers.imp$medication_2  <- ifelse(test = is.na(biomarkers.imp$P835_2 ) == FALSE, yes = 1, no = 0 )
+biomarkers.imp$medication_3  <- ifelse(test = is.na(biomarkers.imp$P835_3 ) == FALSE, yes = 1, no = 0 )
+biomarkers.imp$medication_4  <- ifelse(test = is.na(biomarkers.imp$P835_4 ) == FALSE, yes = 1, no = 0 )
+biomarkers.imp$medication_5  <- ifelse(test = is.na(biomarkers.imp$P835_5 ) == FALSE, yes = 1, no = 0 )
+biomarkers.imp$medication_6  <- ifelse(test = is.na(biomarkers.imp$P835_6 ) == FALSE, yes = 1, no = 0 )
+biomarkers.imp$medication_7  <- ifelse(test = is.na(biomarkers.imp$P835_7 ) == FALSE, yes = 1, no = 0 )
+#biomarkers.imp$medication_8  <- ifelse(test = is.na(biomarkers.imp$P835_8 ) == FALSE, yes = 1, no = 0 )
+#biomarkers$medication_9  <- ifelse(test = is.na(biomarkers$P835_9 ) == FALSE, yes = 1, no = 0 )
+#biomarkers$medication_10 <- ifelse(test = is.na(biomarkers$P835_10 ) == FALSE, yes = 1, no = 0 )
+#biomarkers$medication_11 <- ifelse(test = is.na(biomarkers$P835_11 ) == FALSE, yes = 1, no = 0 )
+#biomarkers$medication_12 <- ifelse(test = is.na(biomarkers$P835_12 ) == FALSE, yes = 1, no = 0 )
+#biomarkers$medication_0  <- ifelse(test = is.na(biomarkers$P835 ) == FALSE, yes = 1, no = 0 )
+
+#compute frequency tables
+#table(biomarkers.imp$medication_1, useNA = "always")
+#table(biomarkers.imp$medication_2, useNA = "always")
+#table(biomarkers.imp$medication_3, useNA = "always")
+#table(biomarkers.imp$medication_4, useNA = "always")
+#table(biomarkers.imp$medication_5, useNA = "always")
+#table(biomarkers.imp$medication_6, useNA = "always")
+#table(biomarkers.imp$medication_7, useNA = "always")
+#table(biomarkers$medication_8, useNA = "always")
+#table(biomarkers$medication_9, useNA = "always")
+#table(biomarkers$medication_10, useNA = "always")
+#table(biomarkers$medication_11, useNA = "always")
+#table(biomarkers$medication_12, useNA = "always")
+#table(biomarkers$medication_0, useNA = "always")
+
+```
+
+Create new combination of vectors not present in the data (medication).  The new variable "number of treatments" was recoded into three levels:  a) none  b) one  c) two or three  d) four or more
+
+```{r}
+biomarkers.imp$medicationsum <- biomarkers.imp$medication_1 + biomarkers.imp$medication_2 + biomarkers.imp$medication_3 + biomarkers.imp$medication_4 + biomarkers.imp$medication_5 + biomarkers.imp$medication_6 + + biomarkers.imp$medication_7
+
+biomarkers.imp$medicationsum <- factor(biomarkers.imp$medicationsum,
+                levels = c("0","1","2","3","4","5","6","7","8","9","10","11","12","13"),
+                labels = c("none","one","two or three", "two or three", "four or more", "four or more", "four or more","four or more","four or more","four or more","four or more","four or more","four or more", "four or more"))
+
+Desc((biomarkers.imp$medicationsum))
+Freq(biomarkers.imp$medicationsum)
+
+```
+
+**Health risk and behaviours data**
+There are three variables present in the data (smoking, alcohol consumption, waist circumference) and two new variables were created from data (BMI and blood pressure).
+
+Alcohol. levels transformation of vector were recoded from five into three main groups/levels:
+a) social drinker  b) moderate or daily drinker  c) non-drinker
+
+```{r }
+biomarkers.imp$alcohol <- factor(biomarkers.imp$alcohol,
+                levels = c("1","2","3","4","5","8","9"),
+                labels = c("social drinker","moderate or daily drinker", "moderate or daily drinker","moderate or daily drinker", "non-drinker","non-drinker","non-drinker"))
+
+Desc(biomarkers.imp$alcohol)
+#Freq(biomarkers.imp$alcohol)
+```
+
+Smoking. Levels of smoking were recoded into binary variable indicating if the participants had ever smoked:
+a) never (4) and b) smoked (1-3)
+
+```{r }
+biomarkers.imp$smoking <- factor(biomarkers.imp$smoking,
+                levels = c("1","2","3","4","8","9"),
+                labels = c("yes","yes", "yes","never", "never","never"))
+
+Desc(biomarkers.imp$smoking)
+Freq(biomarkers.imp$smoking)
+```
+
+Before estimate BMI, higher waist circumference, and blood pressure we need to replace 777,999, and 8888 values (Do not apply) to NA values in seven columns.
+
+```{r bmi}
+#load library to replace the value 777 (Not apply) in the weight and height columns with a missing value (NA)
+library(naniar)
+```
+
+Replace 777 and 999 values (Do not apply) to NA values in seven columns: weight, height, waist circumference, systolic blood pressure right hand, systolic blood pressure left hand, diastolic blood pressure right hand, and diastolic blood pressure left hand.
+
+```{r}
+biomarkers.imp$weight_2 <- ifelse(test = biomarkers.imp$weight %in% c( 777 ), yes = NA, no =  biomarkers.imp$weight )
+biomarkers.imp$height_2 <- ifelse(test = biomarkers.imp$height %in% c( 777 ), yes = NA, no =  biomarkers.imp$height )
+biomarkers.imp$wc_2 <- ifelse(test = biomarkers.imp$wc %in% c( 777 ), yes = NA, no =  biomarkers.imp$wc )
+
+
+
+biomarkers.imp$dyastolic_bprh_2 <- ifelse(test = biomarkers.imp$dyastolic_bprh %in% c( 999, 8888 ), yes = NA, no =  biomarkers.imp$dyastolic_bprh )
+biomarkers.imp$dyastolic_bplh_2 <- ifelse(test = biomarkers.imp$dyastolic_bplh %in% c( 999, 8888 ), yes = NA, no =  biomarkers.imp$dyastolic_bplh )
+biomarkers.imp$systolic_bprh_2 <- ifelse(test = biomarkers.imp$systolic_bprh %in% c( 999, 8888 ), yes = NA, no =  biomarkers.imp$systolic_bprh )
+biomarkers.imp$systolic_bplh_2 <- ifelse(test = biomarkers.imp$systolic_bplh %in% c( 999, 8888 ), yes = NA, no =  biomarkers.imp$systolic_bplh )
+
+#antropometric measures
+table_confer <- biomarkers.imp %>%
+  filter( is.na( weight_2 ) ) 
+  table(table_confer$weight, table_confer$weight_2, useNA = "always"  )
+
+#table_confer_1 <- biomarkers.imp %>%
+  #filter( is.na( height_2 ) ) 
+  #table(table_confer_1$weight, table_confer_1$height_2, useNA = "always"  )
+  
+table_confer_2 <- biomarkers.imp %>%
+  filter( is.na( wc_2 ) ) 
+  table(table_confer_2$wc, table_confer_2$wc_2, useNA = "always"  )
+
+#blood pressure  
+table_confer_3 <- biomarkers.imp %>%
+  filter( is.na( dyastolic_bprh_2 ) ) 
+  table(table_confer_3$dyastolic_bprh, table_confer_3$dyastolic_bprh_2, useNA = "always"  )
+
+table_confer_4 <- biomarkers.imp %>%
+  filter( is.na( dyastolic_bplh_2 ) ) 
+  table(table_confer_4$dyastolic_bplh, table_confer_4$dyastolic_bplh_2, useNA = "always"  )
+  
+table_confer_5 <- biomarkers.imp %>%
+  filter( is.na( systolic_bprh_2 ) ) 
+  table(table_confer_5$systolic_bprh, table_confer_5$systolic_bprh_2, useNA = "always"  )
+
+table_confer_6 <- biomarkers.imp %>%
+  filter( is.na( systolic_bplh_2 ) ) 
+  table(table_confer_6$systolic_bplh, table_confer_6$systolic_bplh_2, useNA = "always"  )
+  
+#table( biomarkers.imp[]$weight, biomarkers.imp$weight_2,useNA = 'always' )
+#table( biomarkers.imp[]$height, biomarkers.imp$height_2,useNA = 'always' )
+#table( biomarkers.imp[]$wc, biomarkers.imp$wc_2,useNA = 'always' )
+#table( biomarkers.imp[]$dyastolic_bprh, biomarkers.imp$dyastolic_bprh_2,useNA = 'always' )
+#table( biomarkers.imp[]$dyastolic_bplh, biomarkers.imp$dyastolic_bplh_2, useNA = 'always' )
+#table( biomarkers.imp[]$systolic_bprh, biomarkers.imp$systolic_bprh_2,useNA = 'always' )
+#table( biomarkers.imp[]$systolic_bplh, biomarkers.imp$systolic_bplh_2,useNA = 'always' )
+```
+
+
+
+Waist circumference. Create new combination of vectors not present in the data (waist-hip ratio).
+vector transformation (WHR OMS Recommendations thresholds) https://doi.org/10.1016/j.jshs.2017.03.011
+
+```{r high waist cincumference}
+biomarkers.imp$wc <- (biomarkers.imp$wc) / (biomarkers.imp$height)
+
+Desc(biomarkers.imp$wc)
+Freq(biomarkers.imp$wc, useNA = "always")
+
+```
+
+Blood pressure. Create new combination of vectors not present in the data (blood pressure).
+According to the WHO's guidelines: Normal adult blood pressure is defined as a blood pressure of 120 mm Hg1 when the heart beats (systolic) and a blood pressure of 80 mm Hg when the heart relaxes (diastolic). When systolic blood pressure is equal to or above 140 mm Hg and/or a diastolic blood pressure equal to or above 90 mm Hg the blood pressure is considered to be raised or high.
+
+Blood Pressure Category	SBP	 	                     DBP
+
+Normal	               < 120 mm Hg	            And	< 80 mm Hg
+Elevated	               120-129 mm Hg	        And	< 80-89 mm Hg
+High Blood Pressure	 	 ≥ 130-mm Hg	         	  ≥90 mm Hg
+
+```{r }
+biomarkers.imp$SBP <- (biomarkers.imp$systolic_bplh + biomarkers.imp$systolic_bprh)/2
+biomarkers.imp$DBP <- (biomarkers.imp$dyastolic_bplh + biomarkers.imp$dyastolic_bprh)/2
+
+biomarkers.imp$SBP <- cut( x = biomarkers.imp$SBP, breaks = c(0, 120, 129, Inf),
+                                                   levels = c("(0,120]","(120,129]","(130,Inf]"),
+                                                   labels = c("normal","elevated","high blood pressure"))
+
+biomarkers.imp$DBP <- cut( x = biomarkers.imp$DBP, breaks = c(0, 80, 89,Inf),
+                                                   levels = c("(0,80]","(80,89]","(90,Inf]"),
+                                                   labels = c("normal","elevated", "high blood pressure"))
+
+Desc(biomarkers.imp$SBP)
+Desc(biomarkers.imp$DBP)
+
+#Freq(biomarkers.imp$SBP, useNA = "always")
+#Freq(biomarkers.imp$DBP, useNA = "always") 
+```
+
+
+
+
+
+
+
+
+
+
 Baseline characteristics by sex.
+
+Article Latent Class Analysis - Trajectories of adversity
+
+First change to factors eavch variable in the table.
+```{r}
+biomarkers.imp$neglected_food     <- as.factor(as.numeric(biomarkers.imp$neglected_food))
+biomarkers.imp$household_violence <- as.factor(as.numeric(biomarkers.imp$household_violence))
+biomarkers.imp$migration          <- as.factor(as.numeric(biomarkers.imp$migration))
+biomarkers.imp$emotional_abuse    <- as.factor(as.numeric(biomarkers.imp$emotional_abuse))
+biomarkers.imp$poor_health3       <- as.factor(as.numeric(biomarkers.imp$poor_health3))
+biomarkers.imp$early_infection    <- as.factor(as.numeric(biomarkers.imp$early_infection))
+
+biomarkers.imp$health_insurance    <- as.factor(as.numeric(biomarkers.imp$health_insurance))
+biomarkers.imp$cash_transfer2      <- as.factor(as.numeric(biomarkers.imp$cash_transfer2))
+biomarkers.imp$cvd                <- as.factor(as.numeric(biomarkers.imp$cvd))
+corr$hta                <- as.factor(as.character(corr$hta))
+biomarkers.imp$diabetes           <- as.factor(as.numeric(biomarkers.imp$diabetes))
+biomarkers.imp$smoking           <- as.factor(as.numeric(biomarkers.imp$smoking))
+biomarkers.imp$alcohol           <- as.factor(as.numeric(biomarkers.imp$alcohol))
+biomarkers.imp$medication           <- as.factor(as.numeric(biomarkers.imp$medication))
+
+```
+
+second generate table with chatracteristics of study population by sex
+```{r}
+table.lac <-table1(~age + ethnic_group + area_residence + neglected_food + household_violence + migration + emotional_abuse + poor_health3 + early_infection + acesum + educational_level + current_sep + sep_occupation + health_insurance + cash_transfer2 + hta + cvd + diabetes + obesity + comorbidities + smoking + alcohol + medication | sex, data=biomarkers.imp)
+
+table.lac
+```
+
+
+Applyig same steps using SABE original databse
+
+First change to factors eavch variable in the table.
+```{r}
+SABE_Colombia$neglected_food     <- as.factor(as.numeric(SABE_Colombia$neglected_food))
+SABE_Colombia$household_violence <- as.factor(as.numeric(SABE_Colombia$household_violence))
+SABE_Colombia$migration_yo          <- as.factor(as.numeric(SABE_Colombia$migration))
+SABE_Colombia$emotional_abuse    <- as.factor(as.numeric(SABE_Colombia$emotional_abuse))
+SABE_Colombia$poor_health3       <- as.factor(as.numeric(SABE_Colombia$poor_health3))
+#biomarkers.imp$early_infection    <- as.factor(as.numeric(biomarkers.imp$early_infection))
+
+SABE_Colombia$health_insurance    <- as.factor(as.numeric(SABE_Colombia$health_insurance))
+SABE_Colombia$cash_transfer2      <- as.factor(as.numeric(SABE_Colombia$cash_transfer2))
+SABE_Colombia$cvd                <- as.factor(as.numericSABE_Colombia$cvd))
+SABE_Colombia$hta                <- as.factor(as.numeric(SABE_Colombia$hta))
+SABE_Colombia$diabetes           <- as.factor(as.numericSABE_Colombia$diabetes))
+SABE_Colombia$smoking           <- as.factor(as.numeric(SABE_Colombia$smoking))
+SABE_Colombia$alcohol           <- as.factor(as.numeric(SABE_Colombia$alcohol))
+SABE_Colombia$medication        <- as.factor(as.numeric(SABE_Colombia$medication))
+
+```
+
+second generate table with chatracteristics of study population by sex
+```{r}
+table.lac <-table1(~age + ethnic_group + area_residence + neglected_food + household_violence + migration + emotional_abuse + poor_health3 + early_infection + acesum + educational_level + current_sep + sep_occupation + health_insurance + cash_transfer2 + hta + cvd + diabetes + obesity + comorbidities + smoking + alcohol + medication | sex, data=biomarkers.imp)
+
+table.lac
+```
+
+
+
+
+
+
 ```{r Table 7. Baseline socioeconomic characteristics of study population by sex, eval=FALSE, include=FALSE}
 
 table_7 <- table1(~family_sep + current_sep + sep_occupation + educational_level + acesum | sex, data=biomarkers.imp)
@@ -511,102 +915,48 @@ export2word( x = table_10_ci, file = '/Users/macbookpro/Documents/PhD Project/Da
 
 ```
 
-**Health outcomes data**
-There are three variables reporting chronic diseases (cardiovascular disease, HTN, and diabetes), and 13 variables reporting medication. Here, we create a new combination of vectors (comorbidities and medication sum).
 
-Chronic conditions and medication by demographic characteristics (sex and age groups).
 
-```{r diseases}
-#Rename values in the health outcomes columns and create a vectors of diseases
-biomarkers.imp$cvd <- factor(biomarkers.imp$cvd,
-                levels = c("1","2","8","9"),
-                labels = c("1","0", "0","0"))
-                
-biomarkers.imp$hta <- factor(biomarkers.imp$hta,
-                levels = c("1","2","8","9"),
-                labels = c("1","0", "0","0"))
-                
-biomarkers.imp$diabetes <- factor(biomarkers.imp$diabetes,
-                levels = c("1","2","8","9"),
-                labels = c("1","0", "0","0"))
-                
+Table 30 Description of study population by chronic conditions (HTA)
+
+```{r Table 30. Description of study population by chronic conditions, eval=FALSE, include=FALSE}
+
+biomarkers.imp$hta      <- factor(biomarkers.imp$hta)
+biomarkers.imp$cvd      <- factor(biomarkers.imp$cvd)
+biomarkers.imp$diabetes <- factor(biomarkers.imp$diabetes)
+
+table_30 <-table1(~ sex + age_group + ethnic_group + acesum + family_sep + current_sep + sep_occupation + educational_level + social.cash.transfer + health_insurance + comorbidities + medicationsum + smoking + alcohol + BMI + SBP + DBP  | hta + diabetes, data=biomarkers.imp)
+
+table_30
+
+table_30_cg <- compareGroups( data = biomarkers.imp, 
+               formula = hta ~ sex + age_group + ethnic_group + acesum + family_sep + current_sep + sep_occupation + educational_level + social.cash.transfer + health_insurance + comorbidities + medicationsum + smoking + alcohol + BMI + SBP + DBP)
+
+table_30_ci <- createTable(x = table_30_cg, show.ci = T, show.n = T, show.all = T )
+
+export2word( x = table_30_ci, file = '/Users/macbookpro/Documents/PhD Project/Data/SABE/Outputs/table_30_ci.docx')
 ```
 
-Create new combination of vectors not present in the data (comorbidity or sum of three chronic conditions).
-formula: comorbidity = cvd + hta + diabetes. This was recoded into three main levels: a) none   b) one   c) two or more conditions 
+Table 31 Description of study population by chronic conditions (Diabetes)
 
-```{r}
-# Multiple conditions to adding new column to data frame:
-#To explicitly coerce objects from one class to another
+```{r Table 31. Description of study population by chronic conditions, eval=FALSE, include=FALSE}
 
-biomarkers.imp$hta      <- as.numeric(as.character(biomarkers.imp$hta))
-biomarkers.imp$diabetes <- as.numeric(as.character(biomarkers.imp$diabetes))
-biomarkers.imp$cvd      <- as.numeric(as.character(biomarkers.imp$cvd))
+biomarkers.imp$hta      <- factor(biomarkers.imp$hta)
+biomarkers.imp$cvd      <- factor(biomarkers.imp$cvd)
+biomarkers.imp$diabetes <- factor(biomarkers.imp$diabetes)
 
-biomarkers.imp$comorbidities <- biomarkers.imp$hta + biomarkers.imp$cvd + biomarkers.imp$diabetes
+table_31 <-table1(~ sex + age_group + ethnic_group + acesum + family_sep + current_sep + sep_occupation + educational_level + social.cash.transfer + health_insurance + comorbidities + medicationsum + smoking + alcohol + BMI + SBP + DBP  | hta + diabetes, data=biomarkers.imp)
 
-#create a vector co-morbidities
-biomarkers.imp$comorbidities <- factor(biomarkers.imp$comorbidities,
-                levels = c("0","1","2","3"),
-                labels = c("none","one", "two or more","two or more"))
+table_31
 
-#Desc(biomarkers.imp$hta)
-#Desc(biomarkers.imp$cvd)
-#Desc(biomarkers.imp$diabetes)
-Desc(biomarkers.imp$comorbidities)
-Freq(biomarkers.imp$comorbidities)
+table_31_cg <- compareGroups( data = biomarkers.imp, 
+               formula = diabetes ~ sex + age_group + ethnic_group + acesum + family_sep + current_sep + sep_occupation + educational_level + social.cash.transfer + health_insurance + comorbidities + medicationsum + smoking + alcohol + BMI + SBP + DBP)
+
+table_31_ci <- createTable(x = table_31_cg, show.ci = T, show.n = T, show.all = T )
+
+export2word( x = table_31_ci, file = '/Users/macbookpro/Documents/PhD Project/Data/SABE/Outputs/table_31_ci.docx')
 ```
 
-Vector transformation of medication. 
-There are 13 medication variables in the dataframe. Vector transformation only constrained seven first variables.
-medication_1
-
-```{r medicines}
-#To explicitly coerce objects from one class to another and vector transformation
-biomarkers.imp$medication_1  <- ifelse(test = is.na(biomarkers.imp$P835_1 ) == FALSE, yes = 1, no = 0 )
-biomarkers.imp$medication_2  <- ifelse(test = is.na(biomarkers.imp$P835_2 ) == FALSE, yes = 1, no = 0 )
-biomarkers.imp$medication_3  <- ifelse(test = is.na(biomarkers.imp$P835_3 ) == FALSE, yes = 1, no = 0 )
-biomarkers.imp$medication_4  <- ifelse(test = is.na(biomarkers.imp$P835_4 ) == FALSE, yes = 1, no = 0 )
-biomarkers.imp$medication_5  <- ifelse(test = is.na(biomarkers.imp$P835_5 ) == FALSE, yes = 1, no = 0 )
-biomarkers.imp$medication_6  <- ifelse(test = is.na(biomarkers.imp$P835_6 ) == FALSE, yes = 1, no = 0 )
-biomarkers.imp$medication_7  <- ifelse(test = is.na(biomarkers.imp$P835_7 ) == FALSE, yes = 1, no = 0 )
-#biomarkers.imp$medication_8  <- ifelse(test = is.na(biomarkers.imp$P835_8 ) == FALSE, yes = 1, no = 0 )
-#biomarkers$medication_9  <- ifelse(test = is.na(biomarkers$P835_9 ) == FALSE, yes = 1, no = 0 )
-#biomarkers$medication_10 <- ifelse(test = is.na(biomarkers$P835_10 ) == FALSE, yes = 1, no = 0 )
-#biomarkers$medication_11 <- ifelse(test = is.na(biomarkers$P835_11 ) == FALSE, yes = 1, no = 0 )
-#biomarkers$medication_12 <- ifelse(test = is.na(biomarkers$P835_12 ) == FALSE, yes = 1, no = 0 )
-#biomarkers$medication_0  <- ifelse(test = is.na(biomarkers$P835 ) == FALSE, yes = 1, no = 0 )
-
-#compute frequency tables
-#table(biomarkers.imp$medication_1, useNA = "always")
-#table(biomarkers.imp$medication_2, useNA = "always")
-#table(biomarkers.imp$medication_3, useNA = "always")
-#table(biomarkers.imp$medication_4, useNA = "always")
-#table(biomarkers.imp$medication_5, useNA = "always")
-#table(biomarkers.imp$medication_6, useNA = "always")
-#table(biomarkers.imp$medication_7, useNA = "always")
-#table(biomarkers$medication_8, useNA = "always")
-#table(biomarkers$medication_9, useNA = "always")
-#table(biomarkers$medication_10, useNA = "always")
-#table(biomarkers$medication_11, useNA = "always")
-#table(biomarkers$medication_12, useNA = "always")
-#table(biomarkers$medication_0, useNA = "always")
-
-```
-
-Create new combination of vectors not present in the data (medication).  The new variable "number of treatments" was recoded into three levels:  a) none  b) one  c) two or three  d) four or more
-
-```{r}
-biomarkers.imp$medicationsum <- biomarkers.imp$medication_1 + biomarkers.imp$medication_2 + biomarkers.imp$medication_3 + biomarkers.imp$medication_4 + biomarkers.imp$medication_5 + biomarkers.imp$medication_6 + + biomarkers.imp$medication_7
-
-biomarkers.imp$medicationsum <- factor(biomarkers.imp$medicationsum,
-                levels = c("0","1","2","3","4","5","6","7","8","9","10","11","12","13"),
-                labels = c("none","one","two or three", "two or three", "four or more", "four or more", "four or more","four or more","four or more","four or more","four or more","four or more","four or more", "four or more"))
-
-Desc((biomarkers.imp$medicationsum))
-Freq(biomarkers.imp$medicationsum)
-
-```
 
 Chronic conditions and medication by demographics characteristics (sex and age groups).
 
@@ -698,151 +1048,7 @@ table_15_ci <- createTable(x = table_15_cg, show.ci = T, show.n = T, show.all = 
 export2word( x = table_15_ci, file = '/Users/macbookpro/Documents/PhD Project/Data/SABE/Outputs/table_15_ci.docx')
 ```
 
-**Health risk and behaviours data**
-There are three variables present in the data (smoking, alcohol consumption, waist circumference) and two new variables were created from data (BMI and blood pressure).
 
-Alcohol. levels transformation of vector were recoded from five into three main groups/levels:
-a) social drinker  b) moderate or daily drinker  c) non-drinker
-
-```{r }
-biomarkers.imp$alcohol <- factor(biomarkers.imp$alcohol,
-                levels = c("1","2","3","4","5","8","9"),
-                labels = c("social drinker","moderate or daily drinker", "moderate or daily drinker","moderate or daily drinker", "non-drinker","non-drinker","non-drinker"))
-
-Desc(biomarkers.imp$alcohol)
-#Freq(biomarkers.imp$alcohol)
-```
-
-Smoking. Levels of smoking were recoded into binary variable indicating if the participants had ever smoked:
-a) never (4) and b) smoked (1-3)
-
-```{r }
-biomarkers.imp$smoking <- factor(biomarkers.imp$smoking,
-                levels = c("1","2","3","4","8","9"),
-                labels = c("yes","yes", "yes","never", "never","never"))
-
-Desc(biomarkers.imp$smoking)
-Freq(biomarkers.imp$smoking)
-```
-
-Before estimate BMI, higher waist circumference, and blood pressure we need to replace 777,999, and 8888 values (Do not apply) to NA values in seven columns.
-
-```{r bmi}
-#load library to replace the value 777 (Not apply) in the weight and height columns with a missing value (NA)
-library(naniar)
-```
-
-Replace 777 and 999 values (Do not apply) to NA values in seven columns: weight, height, waist circumference, systolic blood pressure right hand, systolic blood pressure left hand, diastolic blood pressure right hand, and diastolic blood pressure left hand.
-
-```{r}
-biomarkers.imp$weight_2 <- ifelse(test = biomarkers.imp$weight %in% c( 777 ), yes = NA, no =  biomarkers.imp$weight )
-biomarkers.imp$height_2 <- ifelse(test = biomarkers.imp$height %in% c( 777 ), yes = NA, no =  biomarkers.imp$height )
-biomarkers.imp$wc_2 <- ifelse(test = biomarkers.imp$wc %in% c( 777 ), yes = NA, no =  biomarkers.imp$wc )
-
-biomarkers.imp$dyastolic_bprh_2 <- ifelse(test = biomarkers.imp$dyastolic_bprh %in% c( 999, 8888 ), yes = NA, no =  biomarkers.imp$dyastolic_bprh )
-biomarkers.imp$dyastolic_bplh_2 <- ifelse(test = biomarkers.imp$dyastolic_bplh %in% c( 999, 8888 ), yes = NA, no =  biomarkers.imp$dyastolic_bplh )
-biomarkers.imp$systolic_bprh_2 <- ifelse(test = biomarkers.imp$systolic_bprh %in% c( 999, 8888 ), yes = NA, no =  biomarkers.imp$systolic_bprh )
-biomarkers.imp$systolic_bplh_2 <- ifelse(test = biomarkers.imp$systolic_bplh %in% c( 999, 8888 ), yes = NA, no =  biomarkers.imp$systolic_bplh )
-
-#antropometric measures
-table_confer <- biomarkers.imp %>%
-  filter( is.na( weight_2 ) ) 
-  table(table_confer$weight, table_confer$weight_2, useNA = "always"  )
-
-#table_confer_1 <- biomarkers.imp %>%
-  #filter( is.na( height_2 ) ) 
-  #table(table_confer_1$weight, table_confer_1$height_2, useNA = "always"  )
-  
-table_confer_2 <- biomarkers.imp %>%
-  filter( is.na( wc_2 ) ) 
-  table(table_confer_2$wc, table_confer_2$wc_2, useNA = "always"  )
-
-#blood pressure  
-table_confer_3 <- biomarkers.imp %>%
-  filter( is.na( dyastolic_bprh_2 ) ) 
-  table(table_confer_3$dyastolic_bprh, table_confer_3$dyastolic_bprh_2, useNA = "always"  )
-
-table_confer_4 <- biomarkers.imp %>%
-  filter( is.na( dyastolic_bplh_2 ) ) 
-  table(table_confer_4$dyastolic_bplh, table_confer_4$dyastolic_bplh_2, useNA = "always"  )
-  
-table_confer_5 <- biomarkers.imp %>%
-  filter( is.na( systolic_bprh_2 ) ) 
-  table(table_confer_5$systolic_bprh, table_confer_5$systolic_bprh_2, useNA = "always"  )
-
-table_confer_6 <- biomarkers.imp %>%
-  filter( is.na( systolic_bplh_2 ) ) 
-  table(table_confer_6$systolic_bplh, table_confer_6$systolic_bplh_2, useNA = "always"  )
-  
-#table( biomarkers.imp[]$weight, biomarkers.imp$weight_2,useNA = 'always' )
-#table( biomarkers.imp[]$height, biomarkers.imp$height_2,useNA = 'always' )
-#table( biomarkers.imp[]$wc, biomarkers.imp$wc_2,useNA = 'always' )
-#table( biomarkers.imp[]$dyastolic_bprh, biomarkers.imp$dyastolic_bprh_2,useNA = 'always' )
-#table( biomarkers.imp[]$dyastolic_bplh, biomarkers.imp$dyastolic_bplh_2, useNA = 'always' )
-#table( biomarkers.imp[]$systolic_bprh, biomarkers.imp$systolic_bprh_2,useNA = 'always' )
-#table( biomarkers.imp[]$systolic_bplh, biomarkers.imp$systolic_bplh_2,useNA = 'always' )
-```
-
-Body Mass Index (BMI): Create new combination of vectors (Body Mass Index BMI) not present in the data
-calculate Body Mass Index (BMI) through a function `bmi` that takes a person's weight in lbs and height in inches and returns their [Body Mass Index](https://www.nhs.uk/common-health-questions/lifestyle/what-is-the-body-mass-index-bmi/).
-
-formula: bmi =weight (kg) / height (m) x height (m)
-
-Levels: a) below 25 (normal)  b) between 25 - 30 (Overweight)  c) above 30 (Obese)
-
-```{r }
-biomarkers.imp$height_m <- biomarkers.imp$height_2 / 100
-
-biomarkers.imp$height_m_squared <- (biomarkers.imp$height_m)^2
-
-biomarkers.imp$bmi_2 <- round(biomarkers.imp$weight_2 / (biomarkers.imp$height_m)^2, digits = 2 )
-
-biomarkers.imp$BMI <- cut( x = biomarkers.imp$bmi_2, breaks = c(0, 25, 30, Inf),
-                           levels = c("(0,25]", "(25.1,29.9]", "(30,Inf]"), 
-                           labels = c("below 25 normal", "25 and below 29.9 overweight","above 30 obese"))
-
-#Desc(biomarkers.imp$BMI)
-#Freq(biomarkers.imp$BMI, useNA = "always")
-```
-
-Waist circumference. Create new combination of vectors not present in the data (waist-hip ratio).
-vector transformation (WHR OMS Recommendations thresholds) https://doi.org/10.1016/j.jshs.2017.03.011
-
-```{r high waist cincumference}
-biomarkers.imp$wc <- (biomarkers.imp$wc) / (biomarkers.imp$height)
-
-Desc(biomarkers.imp$wc)
-Freq(biomarkers.imp$wc, useNA = "always")
-
-```
-
-Blood pressure. Create new combination of vectors not present in the data (blood pressure).
-According to the WHO's guidelines: Normal adult blood pressure is defined as a blood pressure of 120 mm Hg1 when the heart beats (systolic) and a blood pressure of 80 mm Hg when the heart relaxes (diastolic). When systolic blood pressure is equal to or above 140 mm Hg and/or a diastolic blood pressure equal to or above 90 mm Hg the blood pressure is considered to be raised or high.
-
-Blood Pressure Category	SBP	 	                     DBP
-
-Normal	               < 120 mm Hg	            And	< 80 mm Hg
-Elevated	               120-129 mm Hg	        And	< 80-89 mm Hg
-High Blood Pressure	 	 ≥ 130-mm Hg	         	  ≥90 mm Hg
-
-```{r }
-biomarkers.imp$SBP <- (biomarkers.imp$systolic_bplh + biomarkers.imp$systolic_bprh)/2
-biomarkers.imp$DBP <- (biomarkers.imp$dyastolic_bplh + biomarkers.imp$dyastolic_bprh)/2
-
-biomarkers.imp$SBP <- cut( x = biomarkers.imp$SBP, breaks = c(0, 120, 129, Inf),
-                                                   levels = c("(0,120]","(120,129]","(130,Inf]"),
-                                                   labels = c("normal","elevated","high blood pressure"))
-
-biomarkers.imp$DBP <- cut( x = biomarkers.imp$DBP, breaks = c(0, 80, 89,Inf),
-                                                   levels = c("(0,80]","(80,89]","(90,Inf]"),
-                                                   labels = c("normal","elevated", "high blood pressure"))
-
-Desc(biomarkers.imp$SBP)
-Desc(biomarkers.imp$DBP)
-
-#Freq(biomarkers.imp$SBP, useNA = "always")
-#Freq(biomarkers.imp$DBP, useNA = "always") 
-```
 
 Health risk by sex and age groups.
 
@@ -896,7 +1102,12 @@ chronic diseases and health risk by education
 
 ```{r Table 19. Description health outcomes and health risks of study population by sex and education level, eval=FALSE, include=FALSE}
 
-table_19 <- table1(~hta + cvd + diabetes + comorbidities + medicationsum + smoking + alcohol + BMI + wc + SBP + DBP | sex + educational_level, data=biomarkers.imp)
+biomarkers.imp$hta     <- as.factor(as.numeric(biomarkers.imp$hta))
+biomarkers.imp$cvd     <- as.factor(as.numeric(biomarkers.imp$cvd))
+biomarkers.imp$diabetes          <- as.factor(as.numeric(biomarkers.imp$diabetes))
+
+
+table_19 <- table1(~sex + hta + cvd + diabetes + comorbidities + medicationsum + smoking + alcohol + BMI + SBP + DBP | educational_level, data=biomarkers.imp)
 
 table_19
 
@@ -923,6 +1134,26 @@ table_20_ci <- createTable(x = table_20_cg, show.ci = T, show.n = T, show.all = 
 
 export2word( x = table_20_ci, file = '/Users/macbookpro/Documents/PhD Project/Data/SABE/Outputs/table_20_ci.docx')
 ```
+
+
+```{r Table --. Background characteristics of study population at the time of 15 years old or less by ACEs groups}
+
+table_40 <- table1(~sex + emotional_abuse + household_violence + neglected_food + poor_health2 + early_infection + migration + family_sep | acesum, data=biomarkers.imp)
+
+table_40
+
+table_40_cg <- compareGroups( data = biomarkers.imp, 
+               formula = acesum  ~  sex + emotional_abuse + household_violence + neglected_food + poor_health2 + early_infection + migration + family_sep)
+
+table_40_ci <- createTable(x = table_40_cg, show.ci = T, show.n = T, show.all = T )
+
+export2word( x = table_40_ci, file = '/Users/macbookpro/Documents/PhD Project/Data/SABE/Outputs/table_40_ci.docx')
+```
+```
+
+
+
+
 
 **3.4. Baseline characteristics of study population study and applying preliminary statistical tests**.
 
@@ -1013,20 +1244,61 @@ export2word( x = baseline5_ci, file = '/Users/macbookpro/Documents/PhD Project/D
 
 ```
 
+HTA
+```{r Table 26. Description baseline characteristics of study population by age groups and HTA}
+table_26 <- table1(~sex + area_residence + ethnic_group + family_sep + current_sep + sep_occupation + educational_level + acesum + health_insurance + social.cash.transfer + cvd + diabetes + comorbidities + medicationsum + smoking + alcohol + BMI + wc + SBP + DBP | age_group + hta, data=biomarkers.imp)
+
+table_26
+
+```
+
+
+Diabetes
+```{r Table 27. Description baseline characteristics of study population by age groups and Diabetes}
+table_27 <- table1(~sex + area_residence + ethnic_group + family_sep + current_sep + sep_occupation + educational_level + acesum + health_insurance + social.cash.transfer + hta + cvd + comorbidities + medicationsum + smoking + alcohol + BMI + wc + SBP + DBP | age_group + diabetes, data=biomarkers.imp)
+
+table_27
+
+```
+
+CVD
+```{r Table 28. Description baseline characteristics of study population by age groups and Diabetes}
+table_28 <- table1(~family_sep + current_sep + sep_occupation + educational_level + acesum + health_insurance + social.cash.transfer | age_group + cvd, data=biomarkers.imp)
+
+table_28
+```
+
+
+comorbidities by SEP
+```{r Table 29. Description baseline characteristics of study population by age groups and comorbildades}
+table_29 <- table1(~family_sep + current_sep + sep_occupation + educational_level + acesum + health_insurance + social.cash.transfer | age_group + comorbidities, data=biomarkers.imp)
+
+table_29
+```
+
+
 **3.5. Cleaning and selecting final data by eliminating columns no needed to calculate BHS**.
 After transformation data we have 91 columns in the dataframe. We delete 66 columns which are no required to the calculation of BHS and regression tables by mapping Null value to them.
 
 ```{r}
-biomarkers.imp$P835_6       <- biomarkers.imp$P835_7       <- biomarkers.imp$P835_1      <- biomarkers.imp$P835_2 <- biomarkers.imp$P835_3       <- biomarkers.imp$P835_4       <- biomarkers.imp$P835_5      <- biomarkers.imp$P835   <- biomarkers.imp$early_infection1 <- biomarkers.imp$early_infection2 <- biomarkers.imp$early_infection3 <- biomarkers.imp$early_infection4 <- biomarkers.imp$early_infection5 <- biomarkers.imp$early_infection7 <- biomarkers.imp$systolic_bprh    <-biomarkers.imp$early_infection   <- biomarkers.imp$early_infection6 <- biomarkers.imp$systolic_bplh    <- biomarkers.imp$dyastolic_bplh   <- biomarkers.imp$cash_transfer1   <- biomarkers.imp$cash_transfer2   <- biomarkers.imp$medication_1     <- biomarkers.imp$medication_2     <- biomarkers.imp$medication_3     <- biomarkers.imp$medication_4     <- biomarkers.imp$medication_5     <- biomarkers.imp$medication_6     <- biomarkers.imp$medication_7     <- biomarkers.imp$medication       <- 
-biomarkers.imp$height_m         <- biomarkers.imp$weight           <- biomarkers.imp$height           <- biomarkers.imp$height_m_squared <- biomarkers.imp$neglected_food   <- biomarkers.imp$emotional_abuse  <- biomarkers.imp$household_violence <- biomarkers.imp$migration      <- biomarkers.imp$migration_yo     <- biomarkers.imp$poor_health2       <- biomarkers.imp$CKD            <- biomarkers.imp$viral.hepatitis  <- 
-biomarkers.imp$measles            <- biomarkers.imp$TB <- biomarkers.imp$rheumatic.fever <- biomarkers.imp$asthma  <- biomarkers.imp$bronchitis         <- biomarkers.imp$nutrition_program <- biomarkers.imp$weight_2  <- biomarkers.imp$height_2 <- biomarkers.imp$wc_2  <- NULL
+biomarkers.imp$P835_6       <- biomarkers.imp$P835_7       <- biomarkers.imp$P835_1      <- biomarkers.imp$P835_2 <- biomarkers.imp$P835_3       <- biomarkers.imp$P835_4       <- biomarkers.imp$P835_5       <- biomarkers.imp$P835   <- biomarkers.imp$early_infection1 <- biomarkers.imp$early_infection2 <- biomarkers.imp$early_infection3 <- biomarkers.imp$early_infection4 <- biomarkers.imp$early_infection5 <- biomarkers.imp$early_infection7 <- biomarkers.imp$systolic_bprh_2    <-biomarkers.imp$early_infection   <- biomarkers.imp$early_infection6 <- biomarkers.imp$systolic_bplh_2    <- biomarkers.imp$dyastolic_bplh_2   <- biomarkers.imp$cash_transfer1   <- biomarkers.imp$cash_transfer2   <- biomarkers.imp$medication_1     <- biomarkers.imp$medication_2     <- biomarkers.imp$medication_3     <- biomarkers.imp$medication_4     <- biomarkers.imp$medication_5     <- biomarkers.imp$medication_6     <- biomarkers.imp$medication_7     <- biomarkers.imp$medication       <- 
+biomarkers.imp$height_m         <- biomarkers.imp$weight           <- biomarkers.imp$height           <- biomarkers.imp$height_m_squared <- biomarkers.imp$migration_yo     <- biomarkers.imp$CKD              <- biomarkers.imp$viral.hepatitis  <- biomarkers.imp$measles            <- biomarkers.imp$TB  <- biomarkers.imp$rheumatic.fever  <- biomarkers.imp$asthma  <- biomarkers.imp$bronchitis         <- biomarkers.imp$nutrition_program <- biomarkers.imp$weight_2   <- biomarkers.imp$height_2  <- biomarkers.imp$wc_2 <- biomarkers.imp$bmi_2 <- NULL
 
 view(biomarkers.imp)
 ```
 
+```{r}
+library(naniar)
+biomarkers.imp %>% replace_with_na(replace = list(biomarkers.imp$bmi_2 >=45))
+```
+```{r}
+Desc(biomarkers$height)
+```
+
+
 Save new dataframe for bivariate analysis and hypothesis testing
 ```{r }
-writexl::write_xlsx( x = biomarkers.imp, path =  '/Users/macbookpro/Documents/PhD Project/Data/SABE/dataframes/biomarkers.imp2.xlsx' )
+writexl::write_xlsx( x = biomarkers.imp, path =  '/Users/macbookpro/Documents/PhD Project/Data/SABE/dataframes/biomarkers.imp.xlsx' )
 ```
 
 Save biomarkers and covariates dataframe (selection of 14 variables). 
@@ -1037,11 +1309,85 @@ myvars1 <- c("ID", "hdl", "ldl", "total_cholesterol", "triglycerides", "glucose"
 covbiomarkers <- biomarkers.imp[myvars1]
 ```
 
-Save covbiomarkers in a separated dataframe for BHS calculation.
+Save biomarkers and covariates TEST slides supervision meeting dataframe. 
 ```{r }
-writexl::write_xlsx( x = covbiomarkers, path =  '/Users/macbookpro/Documents/PhD Project/Data/SABE/dataframes/covbiomarkers.xlsx' )
+test <- c("sex", "age_group","ethnic_group", "family_sep", "acesum","current_sep", "educational_level", "sep_occupation", "health_insurance", "social.cash.transfer", "hta", "cvd", "diabetes", comorbidity", "smoking", "alcohol", "medication", "hdl", "ldl", "total_cholesterol", "triglycerides", "glucose", "glycated_haemoglobin")
+
+tescorr <- dfsabe[test]
+tescorr
 ```
 
+Elliminate vars 
+
+```{r}
+tescorr$early_infection1 <- tescorr$early_infection2 <- tescorr$early_infection3 <- tescorr$early_infection4 <- tescorr$early_infection5 <- tescorr$early_infection7 <- tescorr$systolic_bprh    <-tescorr$early_infection   <- tescorr$early_infection6 <- tescorr$early_infection7 <- tescorr$weight <- tescorr$height <- tescorr$wc       <- tescorr$dyastolic_bplh   <- tescorr$syatolic_bprh <- tescorr$neglected_food <- <- tescorr$syatolic_bprh <- NULL
+
+view(tescorr)
+```
+
+
+
+
+Save covbiomarkers in a separated dataframe for BHS calculation.
+```{r }
+writexl::write_xlsx( x = dfaces, path =  '/Users/macbookpro/Documents/PhD Project/Data/SABE/dataframes/dfaces.xlsx' )
+```
+
+
+mean(biomarkers.imp$age)
+
+```{r}
+Desc(dfbioage$height)
+Desc(dfbioage$weight)
+Desc(dfbioage$wc)
+Desc(dfbioage$tchol)
+Desc(dfbioage$ldl)
+Desc(dfbioage$bmi_2)
+Desc(dfbioage$hd)
+Desc(dfbioage$raw_dist)
+Desc(dfbioage$kdm0)
+Desc(dfbioage$kdm_advance0)
+```
+```{r}
+Desc(dfbioage$height)
+Desc(dfbioage$weight)
+Desc(dfbioage$wc)
+Desc(dfbioage$ldl)
+Desc(dfbioage$trig)
+Desc(dfbioage$hdl)
+Desc(dfbioage$glucose)
+Desc(dfbioage$hba1c)
+Desc(dfbioage$bmi_2)
+Desc(dfbioage$hd)
+Desc(dfbioage$dbp)
+Desc(dfbioage$sbp)
+
+```
+
+```{r}
+#Outliers in LDL and Tchol
+dfbioage$ldl <- ifelse(test = dfbioage$ldl %in% c( 220:286 ), yes = 200, no =  dfbioage$ldl )
+dfbioage$tchol <- ifelse(test = dfbioage$tchol %in% c( 82, 300:364 ), yes = 280, no =  dfbioage$tchol )
+
+dfbioage$wc <- ifelse(test = dfbioage$wc %in% c(121:125 ), yes = mean(dfbioage$wc), no =  dfbioage$wc )
+dfbioage$height <- ifelse(test = dfbioage$height %in% c(102, 193, 197, 128 ), yes = mean(dfbioage$height), no =  dfbioage$height )
+dfbioage$weight <- ifelse(test = dfbioage$weight %in% c(32, 100:117 ), yes = mean(dfbioage$weight), no =  dfbioage$weight )
+dfbioage$trig <- ifelse(test = dfbioage$trig %in% c(300:2062 ), yes = mean(dfbioage$trig), no =  dfbioage$trig )
+dfbioage$hdl <- ifelse(test = dfbioage$hdl %in% c(10, 80:110 ), yes = mean(dfbioage$hdl), no =  dfbioage$hdl )
+dfbioage$glucose <- ifelse(test = dfbioage$glucose %in% c(50:60, 150:543 ), yes = mean(dfbioage$glucose), no =  dfbioage$glucose )
+dfbioage$hba1c <- ifelse(test = dfbioage$hba1c %in% c(18:25 ), yes = mean(dfbioage$hba1c), no =  dfbioage$hba1c )
+dfbioage$bmi_2 <- ifelse(test = dfbioage$bmi_2 %in% c(12.04, 54.25, 55.45, 56.06, 54.85, 53.64, 67.51, 65.10, 62.69, 60.88, 59.67,59.07, 58.47, 57.86, 57, 26, 56.66, 57.26, 53.89, 53.04, 52.44, 51.84, 51, 23, 51.14, 50.63, 50.03, 49.78, 49.43, 48.82, 48.22, 47.02, 47.01, 51.23, 50.94, 47.62, 46.78, 46.57, 45.81 ), yes = mean(dfbioage$bmi_2), no =  dfbioage$bmi_2 )
+dfbioage$dbp <- ifelse(test = dfbioage$dbp %in% c(110:200 ), yes = mean(dfbioage$dbp), no =  dfbioage$dbp )
+dfbioage$sbp <- ifelse(test = dfbioage$sbp %in% c(180:230 ), yes = mean(dfbioage$sbp), no =  dfbioage$sbp )
+
+
+
+```
+
+Save dataframe afte manage outliers
+```{r }
+writexl::write_xlsx( x = dfbioage, path =  '/Users/macbookpro/Documents/PhD Project/Data/SABE/dataframes/dfbioage1.xlsx' )
+```
+
+
 ####END CODE 2####
-
-
