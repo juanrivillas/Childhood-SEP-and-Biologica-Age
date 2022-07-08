@@ -1,4 +1,4 @@
-# Early-life-inequalities-and-biological-aging-Colombia-
+# Childhood SEP-and-biological-age-Colombia-
 
 This repository contents data frames, scripts, results, and supplementary material of the research project "Social patterning of chronic cardiometabolic conditions and biological aging using SABE aging survey data in Colombian population".
 
