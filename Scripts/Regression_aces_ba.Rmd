@@ -1,0 +1,355 @@
+---
+title: "Regression tables BA SEP and predictor models"
+author: "Juan Rivillas"
+date: "06/07/2022"
+output: html_document
+---
+
+Load package
+```{r}
+library(ggplot2)
+library(ggstatsplot)
+```
+
+Check effects in the prediction based on regressions models applying DAG 
+```{r}
+set.seed(123)
+
+## models with exposures-mediators
+mod_ba_child  <- stats::lm(formula = kdm_advance ~ age*sex + Class + childhood_sep + household_violence + migration_yo, data = dataBA)
+mod_ba_aces   <- stats::lm(formula = kdm_advance ~ age*sex + household_violence + migration_yo, data = dataBA)
+mod_ba_adult  <- stats::lm(formula = kdm_advance ~ age*sex + education + sep_occupation + current_sep, data = dataBA)
+
+ggcoefstats(mod_ba_child)
+ggcoefstats(mod_ba_aces)
+ggcoefstats(mod_ba_adult)
+
+# models mediators - outcomes
+mod_hta   <- stats::lm(formula = hta ~ age*sex + kdm_advance, data = dataBA)
+mod_diabetes  <- stats::lm(formula = diabetes ~ age*sex + kdm_advance, data = dataBA)
+mod_cvd  <- stats::lm(formula = cvd ~ age*sex + kdm_advance, data = dataBA)
+mod_bmi  <- stats::lm(formula = bmi ~ age*sex + kdm_advance, data = dataBA)
+
+ggcoefstats(mod_hta)
+ggcoefstats(mod_diabetes)
+ggcoefstats(mod_cvd)
+ggcoefstats(mod_bmi)
+
+# models exposures - outcomes
+mod_hta_aces   <- stats::lm(formula = hta ~ age*sex + household_violence + migration_yo + Class + childhood_sep, data = dataBA)
+mod_dm_aces   <- stats::lm(formula = diabetes ~ age*sex + household_violence + migration_yo + Class + childhood_sep, data = dataBA)
+mod_cvd_aces  <- stats::lm(formula = cvd ~ age*sex + household_violence + migration_yo + Class + childhood_sep, data = dataBA)
+mod_bmi_aces  <- stats::lm(formula = bmi ~ age*sex + household_violence + migration_yo + Class + childhood_sep, data = dataBA)
+
+ggcoefstats(mod_hta_aces)
+ggcoefstats(mod_dm_aces)
+ggcoefstats(mod_cvd_aces)
+ggcoefstats(mod_bmi_aces)
+
+
+# models mediators - outcomes confounder (health risks)
+mod_hta_smo   <- stats::lm(formula = hta ~ age*sex + smoking + alcohol, data = dataBA)
+mod_dm_smo   <- stats::lm(formula = diabetes ~ age*sex + smoking + alcohol, data = dataBA)
+mod_cvd_smo  <- stats::lm(formula = cvd ~ age*sex + smoking + alcohol, data = dataBA)
+mod_bmi_smo  <- stats::lm(formula = bmi ~ age*sex + smoking + alcohol, data = dataBA)
+
+ggcoefstats(mod_hta_smo)
+ggcoefstats(mod_dm_smo)
+ggcoefstats(mod_cvd_smo)
+ggcoefstats(mod_bmi_smo)
+
+# models mediators - outcomes confounder (adult SEP)
+mod_hta_adu   <- stats::lm(formula = hta ~ age*sex + education + sep_occupation + current_sep, data = dataBA)
+mod_dm_adu   <- stats::lm(formula = diabetes ~ age*sex + education + sep_occupation + current_sep, data = dataBA)
+mod_cvd_adu  <- stats::lm(formula = cvd ~ age*sex + education + sep_occupation + current_sep, data = dataBA)
+mod_bmi_adu  <- stats::lm(formula = bmi ~ age*sex + education + sep_occupation + current_sep, data = dataBA)
+
+ggcoefstats(mod_hta_adu)
+ggcoefstats(mod_dm_adu)
+ggcoefstats(mod_cvd_adu)
+ggcoefstats(mod_bmi_adu)
+```
+
+Check coefficients and R squares exposures-mediators
+```{r}
+#Exposures-mediators
+summary(mod_ba_child)
+summary(mod_ba_aces)
+summary(mod_ba_adult)
+
+#Mediators-outcomes
+summary(mod_hta)
+summary(mod_diabetes)
+summary(mod_cvd)
+summary(mod_bmi)
+
+#Exposures-outcomes
+summary(mod_hta_aces)
+summary(mod_dm_aces)
+summary(mod_cvd_aces)
+summary(mod_bmi_aces)
+
+#Mediators-outcomes confounder (health risk)
+summary(mod_hta_smo)
+summary(mod_dm_smo)
+summary(mod_cvd_smo)
+summary(mod_bmi_smo)
+
+#Mediators-outcomes confounder (adult SEP)
+summary(mod_hta_adu)
+summary(mod_dm_adu)
+summary(mod_cvd_adu)
+summary(mod_bmi_adu)
+```
+
+View(dataBA)
+```{r}
+dataBA$poor_health2 <- as.factor(as.character(dataBA$poor_health2))
+```
+
+
+
+Check linear regressions models with 
+```{r}
+set.seed(123)
+
+## models diseases applying DAG confounder-mediators-outcomes
+mod_dm   <- stats::lm(formula = kdm_advance ~ age*sex + kdm + hd + hd_log, data = dataBA)
+mod_hta  <- stats::lm(formula = kdm_advance ~ age*sex + household_violence + neglected_food + early_infection + poor_health2 + emotional_abuse + migration_yo, data = dataBA)
+mod_cvd  <- stats::lm(formula = kdm_advance ~ age*sex + health_insurance + social.cash.transfer + nutrition_program, data = dataBA)
+mod_bmi  <- stats::lm(formula = kdm_advance ~ age*sex + smoking + alcohol + raised_bmi, data = dataBA)
+
+ggcoefstats(mod_dm)
+ggcoefstats(mod_hta)
+ggcoefstats(mod_cvd)
+ggcoefstats(mod_bmi)
+
+```
+
+Check coefficients and R squares
+```{r}
+summary(mod_dm)
+summary(mod_hta)
+summary(mod_cvd)
+summary(mod_bmi)
+```
+
+```{r}
+## models diseases and biomarkers
+mod_dm   <- stats::lm(formula = diabetes ~ bmi + waist + ldl + hdl + trig + totchol +hba1c + glucose + dbp + sbp, data = data)
+mod_hta  <- stats::lm(formula = hta ~ bmi + waist + ldl + hdl + trig + totchol +hba1c + glucose + dbp + sbp, data = data)
+mod_cvd  <- stats::lm(formula = cvd ~ bmi + waist + ldl + hdl + trig + totchol +hba1c + glucose + dbp + sbp, data = data)
+mod_bmi  <- stats::lm(formula = bmi ~ bmi + waist + ldl + hdl + trig + totchol +hba1c + glucose + dbp + sbp, data = data)
+
+ggcoefstats(mod_dm)
+ggcoefstats(mod_hta)
+ggcoefstats(mod_cvd)
+ggcoefstats(mod_bmi)
+```
+
+
+```{r}
+mod_childsep <- stats::lm(formula = bmi ~ Class + childhood_sep, data = data)
+mod_aduldsep <- stats::lm(formula = bmi ~ education + current_sep + sep_occupation, data = data)
+mod_policy  <- stats::lm(formula = bmi ~ health_insurance + social.cash.transfer + nutrition_program, data = data)
+
+ggcoefstats(mod_childsep)
+ggcoefstats(mod_aduldsep)
+ggcoefstats(mod_policy)
+
+summary(mod_childsep)
+summary(mod_aduldsep)
+summary(mod_policy)
+```
+
+
+
+
+#Model BAA and exposures as predictors
+```{r}
+mod_markers <- stats::lm(formula = kdm_advance ~ bmi + waist + ldl + hdl + trig + totchol +hba1c + glucose + dbp + sbp , data = data)
+mod_baa   <- stats::lm(formula = kdm_advance ~ age + hd + hd_log + kdm, data = data)
+mod_aces  <- stats::lm(formula = kdm_advance ~  household_violence + neglected_food + early_infection + poor_health2 + emotional_abuse + migration_yo, data = data)
+mod_childsep <- stats::lm(formula = kdm_advance ~ Class + childhood_sep, data = data)
+mod_aduldsep <- stats::lm(formula = kdm_advance ~ education + current_sep + sep_occupation, data = data)
+mod_policy  <- stats::lm(formula = kdm_advance ~ health_insurance + social.cash.transfer + nutrition_program, data = data)
+mod_outcome <- stats::lm(formula = kdm_advance ~ diabetes + hta + cvd + raised_bmi, data = data)
+mod_risk    <- stats::lm(formula = kdm_advance ~ alcohol + smoking + medication, data = data)
+
+
+ggcoefstats(mod_markers)
+ggcoefstats(mod_baa)
+ggcoefstats(mod_aces)
+ggcoefstats(mod_childsep)
+ggcoefstats(mod_aduldsep)
+ggcoefstats(mod_policy)
+ggcoefstats(mod_outcome)
+ggcoefstats(mod_risk)
+```
+
+
+```
+
+
+
+
+Regressions BA and exposures
+
+## models diseases
+mod_markers <- stats::lm(formula = kdm_advance ~ bmi + waist + ldl + hdl + trig + totchol +hba1c + glucose + dbp + sbp , data = data)
+mod_baa   <- stats::lm(formula = kdm_advance ~ age + hd + hd_log + kdm, data = data)
+mod_aces  <- stats::lm(formula = kdm_advance ~  household_violence + neglected_food + early_infection + poor_health2 + emotional_abuse + migration_yo, data = data)
+mod_childsep <- stats::lm(formula = kdm_advance ~ Class + childhood_sep, data = data)
+mod_aduldsep <- stats::lm(formula = kdm_advance ~ education + current_sep + sep_occupation, data = data)
+mod_policy  <- stats::lm(formula = kdm_advance ~ health_insurance + social.cash.transfer + nutrition_program, data = data)
+mod_outcome <- stats::lm(formula = kdm_advance ~ diabetes + hta + cvd + raised_bmi, data = data)
+mod_risk    <- stats::lm(formula = kdm_advance ~ alcohol + smoking + medication, data = data)
+
+
+ggcoefstats(mod_markers)
+ggcoefstats(mod_baa)
+ggcoefstats(mod_aces)
+ggcoefstats(mod_childsep)
+ggcoefstats(mod_aduldsep)
+ggcoefstats(mod_policy)
+ggcoefstats(mod_outcome)
+ggcoefstats(mod_risk)
+
+
+Check coefficients and R squares
+```{r}
+summary(mod_markers)
+summary(mod_baa)
+summary(mod_aces)
+summary(mod_childsep)
+summary(mod_aduldsep)
+summary(mod_policy)
+summary(mod_outcome)
+summary(mod_risk)
+
+plot(mod_markers)
+plot(mod_baa)
+plot(mod_aces)
+plot(mod_childsep)
+plot(mod_aduldsep)
+plot(mod_policy)
+plot(mod_outcome)
+plot(mod_risk)
+
+```
+Annotations:
+- leave dbp and wc, otherwise model lost Adjusted R-squared and increased Residual standard error. Model markers OK.
+- Model baa: fit.
+- Model mod_aces: only significant domestic violence and migration. Both significant but explain less Adjusted R-squared.
+- mod_childsep: keep CLass child SEP not significant
+
+
+#significant
+```{r}
+## models
+mod_exposure  <- stats::lm(formula = kdm_advance ~  household_violence + Class + childhood_sep + migration_yo, data = data)
+ggcoefstats(mod_exposure)
+
+mod_kdm<- stats::lm(formula = kdm_advance ~ age + race + sex , data = data)
+ggcoefstats(mod_kdm)
+
+mod_outcome <- stats::lm(formula = kdm_advance ~ diabetes + hta + cvd + raised_bmi, data = data)
+ggcoefstats(mod_outcome)
+
+```
+
+
+Check coefficients and R squares
+```{r}
+summary(mod_exposure)
+summary(mod_kdm)
+summary(mod_outcome)
+
+plot(mod_exposure)
+plot(mod_kdm)
+plot(mod_outcome)
+```
+
+Assessing the Goodness of Fit of the Model
+
+To assess how “good” the regression model fits the data, we can look at a couple different metrics:
+
+1. Multiple R-Squared
+
+This  measures the strength of the linear relationship between the predictor variables and the response variable. A multiple R-squared of 1 indicates a perfect linear relationship while a multiple R-squared of 0 indicates no linear relationship whatsoever.
+
+Multiple R is also the square root of R-squared, which is the proportion of the variance in the response variable that can be explained by the predictor variables. In this example, the multiple R-squared is 0.775. Thus, the R-squared is 0.7752 = 0.601. This indicates that 60.1% of the variance in mpg can be explained by the predictors in the model.
+
+
+
+2. Residual Standard Error
+
+This measures the average distance that the observed values fall from the regression line. In this example, the observed values fall an average of 3.008 units from the regression line.
+
+****
+
+
+
+
+
+
+```{r}
+plot(mod_dm)
+plot(mod_hta)
+plot(mod_cvd)
+summary(mod_bmi)
+```
+
+
+
+
+
+Using the Model to Make Predictions
+
+From the output of the model we know that the fitted multiple linear regression equation is as follows:
+
+
+
+Assessing Model Fit:
+
+In typical linear regression, we use R2 as a way to assess how well a model fits the data. This number ranges from 0 to 1, with higher values indicating better model fit.
+
+However, there is no such R2 value for logistic regression. Instead, we can compute a metric known as McFadden’s R2, which ranges from 0 to just under 1. Values close to 0 indicate that the model has no predictive power. In practice, values over 0.40 indicate that a model fits the data very well.
+
+A value of 0.4728807 is quite high for McFadden’s R2, which indicates that our model fits the data very well and has high predictive power.
+
+We can compute McFadden’s R2 for our model using the pR2 function from the pscl package:
+```{r}
+pscl::pR2(mod_markers)["McFadden"]
+pscl::pR2(mod_baa)["McFadden"]
+pscl::pR2(mod_aces)["McFadden"]
+pscl::pR2(mod_childsep)["McFadden"]
+pscl::pR2(mod_aduldsep)["McFadden"]
+pscl::pR2(mod_policy)["McFadden"]
+pscl::pR2(mod_outcome)["McFadden"]
+pscl::pR2(mod_risk)["McFadden"]
+
+pscl::pR2(mod_baa)["McFadden"]
+pscl::pR2(mod_baa2)["McFadden"]
+pscl::pR2(mod_exposure)["McFadden"]
+pscl::pR2(mod_outcome)["McFadden"]
+
+```
+
+Variable Importance:
+
+We can also compute the importance of each predictor variable in the model by using the varImp function from the caret package:
+
+install.packages('caret')
+install.packages("caret", dependencies = c("Depends", "Suggests"))
+pak::pak('topepo/caret/pkg/caret')
+library(package = "lattice")
+The caret package (short for Classification And REgression Training) is a set of functions that attempt to streamline the process for creating predictive models.
+
+```{r}
+caret::varImp(mod_baa)
+caret::varImp(mod_baa2)
+caret::varImp(mod_exposure)
+caret::varImp(mod_outcome)
+```
+
