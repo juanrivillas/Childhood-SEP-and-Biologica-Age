@@ -1,0 +1,443 @@
+---
+title: "Mediation analysis"
+author: "Juan Rivillas"
+date: "07/08/2022"
+output: html_document
+---
+
+
+
+load packages
+```{r}
+install.packages('mediation')
+library(mediation) 
+library(sjPlot)   #Nice tables regression
+```
+
+Prelimminary steps (check factor for ordering level and reference)
+
+```{r}
+dataBA2 <- within (dataBA2, aces <- relevel (aces, ref = 'Low-risk'))
+
+#males as reference group 
+dataBA2$gender <- factor(dataBA2$gender,
+                levels = c("female","male"),
+                labels = c("2", "1"))
+
+dataBA2 <- within (dataBA2, gender <- relevel (gender, ref = '1'))
+
+#white as reference group
+ethnic_group <- factor(dataBA2$ethnic_group, levels=c("afrocolombian","indigenous", "mestize", "other", "white"))
+
+dataBA2$ethnic_group <- factor(dataBA2$ethnic_group,
+                levels = c("afrocolombian","indigenous","mestize","other","white"),
+                labels = c("2", "3", "4","5","1"))
+
+dataBA2 <- within (dataBA2, ethnic_group <- relevel (ethnic_group, ref = '1'))
+
+```
+
+
+HYPERTENSION
+#Step #1: The total effect
+So, we start by running a simple linear regression of the iv onto the dv plus any covariates you might have (two in our case).
+```{r}
+fit.totaleffect=glm(hta ~ aces + gender + ethnic_group, family = binomial(logit), data = dataBA2)
+summary(fit.totaleffect)
+#This will yield the results below.
+```
+
+The total effect of aces on HTA is not significant, and the coefficient (0.12070).
+
+AIC: 4612.5
+
+So now we have a non-significant total effect. Let’s proceed to step 2.
+
+#Step #2: The effect of the IV onto the mediator
+To establish any mediation, the independent variables (aces and childhood SEP”) must significantly affect the mediator. This makes sense, as, for a mediation to take place, the iv must significantly impact the mediator.
+
+So we do another simple linear regression of the aces onto the mediator (KDM) plus covariates.
+
+```{r}
+fit.mediator=lm(kdm_advance~aces+gender+ethnic_group,dataBA2)
+summary(fit.mediator)
+#This will yield the following results below.
+```
+The effect of aces on KDM is significant (1.755e-08). Now we have a significant effect of the independent variable “aces” onto the mediator “KDM”.
+
+
+#Step #3: The effect of the mediator on the dependent variable
+So, we do a simple linear regression of the independent variable and the mediator onto the dependent variable plus any covariates.
+
+```{r}
+fit.dv=glm(hta~aces+kdm_advance+gender+ethnic_group,family = binomial(logit), data = dataBA2)
+summary(fit.dv)
+#This yields the following output:
+```
+
+The third step confirms that the mediator does not affect the dependent variable while controlling for the independent variable (except for gender and afro Colombian groups). 
+
+###CORRECT THIS####
+Interpretation of the outcome:
+a) The mediator has a significant effect (3.59e-07 ***) on the outcome (HTA). This means that there is a mediation with the coefficient (.73).
+b) ACES was not significant predictor of the HTA. This means that the total effect of the IV on the DV is explained by the mediator. This means that the total effect of “ACES” onto “HTA” goes through “KDM BA.” Mediation analysis helps us understand the process of the effect of the predictor onto the outcome better.
+
+Tabulate direct and indirect effect (no included total effect)
+```{r}
+mediation_hta_aces <- tab_model(fit.totaleffect, fit.mediator, fit.dv)
+mediation_hta_aces
+```
+
+#Step #4: Causal Mediation Analysis
+#Let’s load up the necessary R packages.
+```{r}
+install.packages("mediation") #uncomment this command in case you haven't installed the mediation package yet.
+library(mediation)
+```
+
+This loads (and installs) the Mediation package, which takes the regression models we just estimated, combines them and estimates the whole mediation. So let’s run the command.
+
+```{r}
+results = mediate(fit.mediator, fit.dv, treat='aces', mediator='kdm_advance', boot=T)
+summary(results)
+```
+
+******OBESITY*******
+#Step #1: The total effect
+```{r}
+fit.totaleffect=glm(obesity~aces+gender+ethnic_group, family = binomial(logit), data = dataBA2)
+summary(fit.totaleffect)
+#This will yield the results below.
+```
+
+#Step #2: The effect of the IV onto the mediator
+```{r}
+fit.mediator=lm(kdm_advance~aces+gender+ethnic_group,dataBA2)
+summary(fit.mediator)
+#This will yield the following results below.
+```
+
+#Step #3: The effect of the mediator on the dependent variable
+```{r}
+fit.dv=glm(obesity~aces+kdm_advance+gender+ethnic_group,family = binomial(logit), data = dataBA2)
+summary(fit.dv)
+#This yields the following output:
+```
+
+Tabulate direct and indirect effect (no included total effect)
+```{r}
+mediation_obe_aces <- tab_model(fit.totaleffect, fit.mediator, fit.dv)
+mediation_obe_aces
+```
+
+#Step #4: Causal Mediation Analysis 
+Mediation is a mini structural equation model (SEM).
+```{r}
+results = mediate(fit.mediator, fit.dv, treat='aces', mediator='kdm_advance', boot=T)
+summary(results)
+```
+
+*****Cardiovascular disease****
+
+#Step #1: The total effect
+```{r}
+fit.totaleffect=glm(cvd~aces+gender+ethnic_group, family = binomial(logit), data = dataBA2)
+summary(fit.totaleffect)
+#This will yield the results below.
+```
+
+#Step #2: The effect of the IV onto the mediator
+```{r}
+fit.mediator=lm(kdm_advance~aces+gender+ethnic_group,dataBA2)
+summary(fit.mediator)
+#This will yield the following results below.
+```
+
+#Step #3: The effect of the mediator on the dependent variable
+```{r}
+fit.dv=glm(cvd~aces+kdm_advance+gender+ethnic_group,family = binomial(logit), data = dataBA2)
+summary(fit.dv)
+#This yields the following output:
+```
+
+
+Tabulate direct and indirect effect (no included total effect)
+```{r}
+mediation_cvd_aces <- tab_model(fit.totaleffect, fit.mediator, fit.dv)
+mediation_cvd_aces
+```
+
+#Step #4: Causal Mediation Analysis
+```{r}
+results = mediate(fit.mediator, fit.dv, treat='aces', mediator='kdm_advance', boot=T)
+summary(results)
+```
+
+
+******DIABETES******
+
+#Step #1: The total effect
+```{r}
+fit.totaleffect=glm(diabetes~aces+gender+ethnic_group, family = binomial(logit), data = dataBA2)
+summary(fit.totaleffect)
+#This will yield the results below.
+```
+
+#Step #2: The effect of the IV onto the mediator
+```{r}
+fit.mediator=lm(kdm_advance~aces+gender+ethnic_group,dataBA2)
+summary(fit.mediator)
+#This will yield the following results below.
+```
+
+#Step #3: The effect of the mediator on the dependent variable
+```{r}
+fit.dv=glm(diabetes~aces+kdm_advance+gender+ethnic_group,family = binomial(logit), data = dataBA2)
+summary(fit.dv)
+#This yields the following output:
+```
+
+
+Tabulate direct and indirect effect (no included total effect)
+```{r}
+mediation_dm_aces <- tab_model(fit.totaleffect, fit.mediator, fit.dv)
+mediation_dm_aces
+```
+
+
+#Step #4: Causal Mediation Analysis
+```{r}
+results = mediate(fit.mediator, fit.dv, treat='aces', mediator='kdm_advance', boot=T)
+summary(results)
+```
+
+
+Childhood SEP
+
+*******HTA*******
+
+#Step #1: The total effect
+```{r}
+fit.totaleffect=glm(hta~low_childhood_sep+gender+ethnic_group, family = binomial(logit), data = dataBA2)
+summary(fit.totaleffect)
+#This will yield the results below.
+```
+
+#Step #2: The effect of the IV onto the mediator
+```{r}
+fit.mediator=lm(kdm_advance~low_childhood_sep+gender+ethnic_group,dataBA2)
+summary(fit.mediator)
+#This will yield the following results below.
+```
+
+#Step #3: The effect of the mediator on the dependent variable
+```{r}
+fit.dv=glm(hta~low_childhood_sep+kdm_advance+gender+ethnic_group,family = binomial(logit), data = dataBA2)
+summary(fit.dv)
+#This yields the following output:
+```
+
+
+Tabulate direct and indirect effect (no included total effect)
+```{r}
+mediation_hta_sep <- tab_model(fit.totaleffect, fit.mediator, fit.dv)
+mediation_hta_sep
+```
+
+
+
+#Step #4: Causal Mediation Analysis
+```{r}
+results = mediate(fit.mediator, fit.dv, treat='low_childhood_sep', mediator='kdm_advance', boot=T)
+summary(results)
+```
+
+
+*******CVD******
+
+#Step #1: The Direct effect
+```{r}
+fit.totaleffect=glm(cvd~low_childhood_sep+gender+ethnic_group, family = binomial(logit), data = dataBA2)
+summary(fit.totaleffect)
+#This will yield the results below.
+```
+
+#Step #2: The effect of the IV onto the mediator
+```{r}
+fit.mediator=lm(kdm_advance~low_childhood_sep+gender+ethnic_group,dataBA2)
+summary(fit.mediator)
+#This will yield the following results below.
+```
+
+#Step #3: The effect of the mediator on the dependent variable
+```{r}
+fit.dv=glm(cvd~low_childhood_sep+kdm_advance+gender+ethnic_group,family = binomial(logit), data = dataBA2)
+summary(fit.dv)
+#This yields the following output:
+```
+
+
+Tabulate direct and indirect effect (no included total effect)
+```{r}
+mediation_cvd_sep <- tab_model(fit.totaleffect, fit.mediator, fit.dv)
+mediation_cvd_sep
+```
+
+
+
+#Step #4: Causal Mediation Analysis
+```{r}
+results = mediate(fit.mediator, fit.dv, treat='low_childhood_sep', mediator='kdm_advance', boot=T)
+summary(results)
+```
+
+
+******DIABETES******
+
+#Step #1: The total effect
+```{r}
+fit.totaleffect=glm(diabetes~low_childhood_sep+gender+ethnic_group, family = binomial(logit), data = dataBA2)
+summary(fit.totaleffect)
+#This will yield the results below.
+```
+
+#Step #2: The effect of the IV onto the mediator
+```{r}
+fit.mediator=lm(kdm_advance~low_childhood_sep+gender+ethnic_group,dataBA2)
+summary(fit.mediator)
+#This will yield the following results below.
+```
+
+
+#Step #3: The effect of the mediator on the dependent variable
+```{r}
+fit.dv=glm(diabetes~low_childhood_sep+kdm_advance+gender+ethnic_group,family = binomial(logit), data = dataBA2)
+summary(fit.dv)
+#This yields the following output:
+```
+
+
+Tabulate direct and indirect effect (no included total effect)
+```{r}
+mediation_dm_sep <- tab_model(fit.totaleffect, fit.mediator, fit.dv)
+mediation_dm_sep
+```
+
+#Step #4: Causal Mediation Analysis
+```{r}
+results = mediate(fit.mediator, fit.dv, treat='low_childhood_sep', mediator='kdm_advance', boot=T)
+summary(results)
+```
+
+
+
+*****OBESITY******
+
+#Step #1: The total effect
+```{r}
+fit.totaleffect=glm(obesity~low_childhood_sep+gender+ethnic_group, family = binomial(logit), data = dataBA2)
+summary(fit.totaleffect)
+#This will yield the results below.
+```
+
+#Step #2: The effect of the IV onto the mediator
+```{r}
+fit.mediator=lm(kdm_advance~low_childhood_sep+gender+ethnic_group,dataBA2)
+summary(fit.mediator)
+#This will yield the following results below.
+```
+
+#Step #3: The effect of the mediator on the dependent variable
+```{r}
+fit.dv=glm(obesity~low_childhood_sep+kdm_advance+gender+ethnic_group,family = binomial(logit), data = dataBA2)
+summary(fit.dv)
+#This yields the following output:
+```
+
+Tabulate direct and indirect effect (no included total effect)
+```{r}
+mediation_obe_sep <- tab_model(fit.totaleffect, fit.mediator, fit.dv)
+mediation_obe_sep
+```
+
+
+#Step #4: Causal Mediation Analysis
+```{r}
+results = mediate(fit.mediator, fit.dv, treat='low_childhood_sep', mediator='kdm_advance', boot=T)
+summary(results)
+```
+
+Tabulate direct and indirect effect (no included total effect)
+```{r}
+tab_model(fit.totaleffect, fit.mediator, fit.dv)
+```
+
+
+
+
+
+
+
+
+
+###CHECK THIS AGAIN#####
+In order to assess whether differential recall bias in reporting ACES is present, the models were also adjusted for childhood SEP in SABE.
+
+#Step #1: The total effect
+```{r}
+fit.totaleffect=glm(obesity~low_childhood_sep+aces+gender+ethnic_group, family = binomial(logit), data = dataBA2)
+summary(fit.totaleffect)
+#This will yield the results below.
+```
+
+#Step #2: The effect of the IV onto the mediator
+```{r}
+fit.mediator=lm(kdm_advance~low_childhood_sep*aces+gender+ethnic_group,dataBA2)
+summary(fit.mediator)
+#This will yield the following results below.
+```
+
+
+#Step #3: The effect of the mediator on the dependent variable
+```{r}
+fit.dv=glm(obesity~low_childhood_sep*kdm_advance*aces+gender+ethnic_group,family = binomial(logit), data = dataBA2)
+summary(fit.dv)
+#This yields the following output:
+```
+
+#Step #4: Causal Mediation Analysis
+```{r}
+results = mediate(fit.mediator, fit.dv, treat='low_childhood_sep', mediator='kdm_advance', boot=T)
+summary(results)
+```
+
+Recall bias controlling ACES by low childhood SEP
+```{r}
+
+#Step #1: The total effect
+fit.totaleffect=glm(hta~aces*low_childhood_sep+gender+ethnic_group, family = binomial(logit), data = dataBA2)
+summary(fit.totaleffect)
+#This will yield the results below.
+```
+
+
+#Step #2: The effect of the IV onto the mediator
+```{r}
+fit.mediator=lm(kdm_advance~low_childhood_sep*aces+gender+ethnic_group,dataBA2)
+summary(fit.mediator)
+#This will yield the following results below.
+```
+
+
+#Step #3: The effect of the mediator on the dependent variable
+```{r}
+fit.dv=glm(hta~aces*kdm_advance*low_childhood_sep*gender+ethnic_group,family = binomial(logit), data = dataBA2)
+summary(fit.dv)
+#This yields the following output:
+```
+
+#Step #4: Causal Mediation Analysis
+```{r}
+results = mediate(fit.mediator, fit.dv, treat='aces', mediator='kdm_advance', boot=T)
+summary(results)
+```
