@@ -14,5 +14,7 @@ Code 4. Hypothesis testing, matrix correlations, and data visualization. This Ma
 
 Code 5. Quantification of Biological Age BA Calculation. Klemera-Doubal Method (KDM) Biological Age and Homeostatict Dysregulation (HD) algorithms were estimated using BioAge package. A working set of ten biological markers were compute in the BAA.
 
-Code 5. Regression tables and predictor models.
+Code 5. Regression tables and predictor models: ACE-BA, BA-disease, and ACE-disease.
+
+Code 6. Mediation analysis by biological age. Direct and indirect effects of ACE and BA on outcomes.
 
