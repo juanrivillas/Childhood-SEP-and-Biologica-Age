@@ -1,0 +1,567 @@
+---
+title: "Weighting sample for selection bias"
+author: "Juan Rivillas"
+date: "20/07/2022"
+output: html_document
+---
+
+Objective: use raking method to calibrate and improve the efficiency of our estimates (reduce standard errors).
+
+This R Markdown include:
+- To explore how different key variables of SABE survey behave after adjusting (weight adjustments is variable-dependent)
+- Identify extreme weights and truncate them. For example, those greater than five times the mean of weights.
+- Truncate large values, but not small ones (i.e., those near zero). While large values increase the effect of outliers and are more likely to inflate variance, low values do not.
+- To examine the design effect using the new weights. If the new design effect is greater than the old design effect by more than 0.5, it is a good idea to review the raking adjustment. In other words, calibration may cost too much in terms of efficiency (standard errors).
+
+
+#Load packages
+```{r eval=FALSE, include=FALSE}
+install.packages("weights")
+install.packages("table1")
+library(weights)
+library(table1)
+
+library(lattice)
+
+install.packages ("latticeExtra")
+library(latticeExtra)
+
+install.packages('WeightIt')
+library("WeightIt")
+
+install.packages("anesrake")
+library(anesrake)
+
+library(tidyverse)  #Tidy data and transformation
+library(dplyr)       
+library(epiDisplay) #to make frequency table in r (nicer version)
+library(DescTools)  #single and cumulative frequencies values are reported.
+library(table1)     #to Create HTML Tables of Descriptive Statistics in epi
+library("ggplot2")  #improved plots and bar charts
+library(haven)
+library(devtools)
+```
+#load dataset
+```{r}
+library(readxl)
+data3 <- read_excel("Documents/PhD Project/Data/SABE/Dataframes/data3.xlsx")
+View(data3)  
+```
+
+
+#Overview of the entire dataframe** (missing values, complete rates, histograms).
+```{r echo=TRUE}
+skimr::skim(data3)
+summary(data3)
+```
+
+
+I use three variables to define raking weights: sex, area residence, and adult sep. I get relative frequencies of these variables using the package weights. Most of the variables have more than five percent in each category, with the exception of sep. For illustrative purposes, I will use those variables without collapsing their categories.
+
+```{r}
+# sex: 1 male, 2 female
+wpct(data3$sex)
+wpct(data3$current_sep)
+```
+
+There are an gender imbalance in the data. According to the 2015 DHS and 2018 population census: females (51%) and males (49%).
+```{r}
+# area of residence
+wpct(data3$area_residence)
+```
+
+
+Convert characters and factor to numeric values
+```{r}
+data3$sex <- factor(data3$sex,
+                levels = c("female","male"),
+                labels = c("1", "2"))
+
+Desc(data3$sex)
+Freq(data3$sex) 
+```
+
+```{r}
+data3$area_residence <- factor(data3$area_residence,
+                levels = c("rural","urban"),
+                labels = c("1", "2"))
+
+Desc(data3$area_residence, useNA = "always")
+Freq(data3$area_residence)
+```
+
+```{r}
+data3$current_sep <- factor(data3$current_sep,
+                levels = c("high","intermediate","low"),
+                labels = c("1","2","3"))
+
+Desc(data3$current_sep, useNA = "always")
+Freq(data3$current_sep)
+
+```
+
+
+```{r}
+data3$sex <- as.numeric(as.factor(data3$sex))
+data3$area_residence <- as.numeric(as.factor(data3$area_residence))
+data3$current_sep <- as.numeric(as.factor(data3$current_sep))
+
+```
+
+#Addressing gender bias apply anesrake package
+
+The next step is to specify the population distribution of the selected variables in a target list. I use two sources to obtain population values: 2015 DHS, and the census population 2018. It is hard to find reliable SEP population parameters. The DANE data provides, at least, an approximation.
+```{r}
+# DHS 2015 and population census 2018
+sextarg <- c(.51,.49)
+area_residencetarg <- c(.26,.74)
+current_septarg <- c(.07,.40,.53)
+
+names(sextarg) <- c("female", "male")
+names(area_residencetarg) <- c("rural", "urban")
+names(current_septarg) <- c("high","intermediate","low")
+
+# definitions of target list
+targets <- list(sex, area_residence, current_sep)
+# important: to use the same variable names of the dataset
+names(targets) <- c("sex", "area_residence", "current_sep")
+# id variable
+data3$caseid <- 1:length(data3$sex)
+```
+
+I apply the anesrake function as follows:
+
+The maximum weight value is five, weights greater than five will be truncated (cap = 5).
+The total differences between population and sample have to be greater than 0.05 so that to include a variable (pctlim = .05).
+The maximum number of variables included in the raking procedure is five (nlim = 5).
+
+First attempt: "Raking converged in 2 iterations"
+2 attempt: "Raking converged in 12 iterations"
+3 attempt "Raking converged in 24 iterations"
+
+```{r}
+raking <- anesrake(targets,
+                    as.data.frame(data3),
+                    data3$caseid,
+                    cap = 5,                      # Maximum allowed weight per iteration
+                    choosemethod = "total",       # How are parameters compared for selection?
+                    type = "pctlim",              # What selection criterion is used?
+                    pctlim = .005)               # Threshold for selection
+                    
+```
+
+
+2 attempt: As can be seen in the anesrake output, the design effect is 1.08.
+
+```{r}
+# add weights to the dataset
+data3$weightvec  <- unlist(raking[1])
+n  <- length(data3$sex)
+
+# weighting loss
+((sum(data3$weightvec ^ 2) / (sum(data3$weightvec)) ^ 2) * n) - 1
+```
+
+
+Anyway, the weighting loss approximation denotes an increase in the design effect lower than .5, what meets the recommendations mentioned above. However, this weighting procedure does not take into account any clustering effect associated with the sample design.
+
+
+Change levels: low SEP: yes/no
+
+```{r}
+data3$childhood_sep <- factor(data3$childhood_sep,
+                levels = c("difficult","good", "No reply/Dont know", "very difficult"),
+                labels = c("yes", "no", "no", "yes"))
+
+Desc(data3$childhood_sep, useNA = "always")
+Freq(data3$childhood_sep)
+```
+
+
+
+```{r}
+#Finally, we can estimate childhood SEP with and without weights:
+
+unweighted <-  wpct(data3$childhood_sep)
+weighted  <-  wpct(data3$childhood_sep, data3$weightvec)
+tab  <- data.frame(unweighted, weighted)
+rownames(tab)  <- c("yes", "no")
+tab
+```
+
+The difference between the weighted and unweighted childhood SEP is not big.
+
+```{r}
+#Finally, we can estimate sex with and without weights:
+
+unweighted <-  wpct(data3$sex)
+weighted  <-  wpct(data3$sex, data3$weightvec)
+tab  <- data.frame(unweighted, weighted)
+rownames(tab)  <- c("females", "males")
+tab
+```
+
+```{r}
+#Finally, we can estimate area of residence with and without weights:
+
+unweighted <-  wpct(data3$area_residence)
+weighted  <-  wpct(data3$area_residence, data3$weightvec)
+tab  <- data.frame(unweighted, weighted)
+rownames(tab)  <- c("rural", "urbana")
+tab
+```
+
+```{r}
+unweighted <-  wpct(data3$household_violence)
+weighted  <-  wpct(data3$household_violence, data3$weightvec)
+tab  <- data.frame(unweighted, weighted)
+rownames(tab)  <- c("No", "yes")
+tab
+```
+
+```{r}
+unweighted <-  wpct(data3$current_sep)
+weighted  <-  wpct(data3$current_sep, data3$weightvec)
+tab  <- data.frame(unweighted, weighted)
+rownames(tab)  <- c("high", "intermediate","low")
+tab
+```
+
+Change levels: combine others with not reply
+
+```{r}
+data3$ethnic_group <- factor(data3$ethnic_group,
+                levels = c("afrocolombian","indigenous", "mestize", "No reply/Dont know", "other", "white"),
+                labels = c("afrocolombian","indigenous", "mestize", "other", "other", "white"))
+
+Desc(data3$ethnic_group, useNA = "always")
+Freq(data3$ethnic_group)
+```
+
+
+
+```{r}
+unweighted <-  wpct(data3$ethnic_group)
+weighted  <-  wpct(data3$ethnic_group, data3$weightvec)
+tab  <- data.frame(unweighted, weighted)
+#rownames(tab)  <- c("lowest", "highest")
+tab
+```
+
+
+```{r}
+unweighted <-  wpct(data3$ethnic_group)
+weighted  <-  wpct(data3$ethnic_group, data3$weightvec)
+tab  <- data.frame(unweighted, weighted)
+#rownames(tab)  <- c("lowest", "highest")
+tab
+```
+
+
+Change levels: education (NOT reply and low)
+
+```{r}
+data3$educational_level <- factor(data3$educational_level,
+                levels = c("low","intermediate", "high", "No reply/Dont know"),
+                labels = c("low","intermediate", "high", "low"))
+
+Desc(data3$educational_level, useNA = "always")
+Freq(data3$educational_level)
+```
+
+
+```{r}
+unweighted <-  wpct(data3$educational_level)
+weighted  <-  wpct(data3$educational_level, data3$weightvec)
+tab  <- data.frame(unweighted, weighted)
+#rownames(tab)  <- c("lowest", "highest")
+tab
+```
+
+Change levels: HIS  inunsured and subsidised
+
+```{r}
+data3$health_insurance <- factor(data3$health_insurance,
+                levels = c("subsidised","insured", "uninsured"),
+                labels = c("subsidised","insured", "subsidised"))
+
+Desc(data3$health_insurance, useNA = "always")
+Freq(data3$health_insurance)
+```
+
+```{r}
+unweighted <-  wpct(data3$health_insurance)
+weighted  <-  wpct(data3$health_insurance, data3$weightvec)
+tab  <- data.frame(unweighted, weighted)
+#rownames(tab)  <- c("lowest", "highest")
+tab
+```
+
+Change levels: social policies yes/no + NA
+```{r}
+data3$cash_transfer2 <- factor(data3$cash_transfer2,
+                levels = c("1","2","8","9"),
+                labels = c("yes","no", "no","no"))
+
+Desc(data3$cash_transfer2, useNA = "always")
+Freq(data3$cash_transfer2)
+```
+
+
+```{r}
+unweighted <-  wpct(data3$cash_transfer2)
+weighted  <-  wpct(data3$cash_transfer2, data3$weightvec)
+tab  <- data.frame(unweighted, weighted)
+#rownames(tab)  <- c("lowest", "highest")
+tab
+```
+
+
+Desc(data3$alcohol, useNA = "always")
+
+```{r }
+data3$alcohol <- factor(data3$alcohol,
+                levels = c("social drinker","moderate drinker", "non-drinker"),
+                labels = c("social drinker","social drinker", "non-drinker"))
+
+Desc(data3$alcohol, useNA = "always")
+Freq(data3$alcohol)
+```
+
+
+Smoking. Levels of smoking were recoded into binary variable indicating if the participants had ever smoked:
+a) never (4) and b) smoked (1-3)
+
+```{r }
+data3$smoking <- factor(data3$smoking,
+                levels = c("1","2","3","4","8","9"),
+                labels = c("yes","yes","yes","never","never","never"))
+
+Desc(data3$smoking, useNA = "always")
+Freq(data3$smoking)
+```
+
+
+
+```{r}
+unweighted <-  wpct(data3$smoking)
+weighted  <-  wpct(data3$smoking, data3$weightvec)
+tab  <- data.frame(unweighted, weighted)
+#rownames(tab)  <- c("lowest", "highest")
+tab
+```
+
+```{r}
+unweighted <-  wpct(data3$age)
+weighted  <-  wpct(data3$age, data3$weightvec)
+tab  <- data.frame(unweighted, weighted)
+#rownames(tab)  <- c("lowest", "highest")
+tab
+```
+
+```{r}
+Median(data3$age)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+writexl::write_xlsx( x = data3, path =  '/Users/macbookpro/Documents/PhD Project/Data/SABE/dataframes/data3.xlsx' )
+```
+
+
+The differences between the sample and population distribution are big.
+
+Desc (data3$ldl)
+summary (raking)
+View (raking)
+
+
+summary (data.frame)
+View (data.frame)
+
+```{r}
+caseweights <- data.frame(cases=raking$caseid, weights=raking$weightvec)
+summary(caseweights)
+View(caseweights)
+summary(raking)
+```
+
+
+
+
+Check the output if some distributions do not sum one. This is because of rounding. We can force any proportion distribution to sum one using force1 = TRUE. The differences between the population and the sample distribution are all greater than five percentage points. This meets the variable selection criterion discussed above.
+
+```{r}
+levels(biomarkers$sex)
+levels(biomarkers$area_residence)
+levels(biomarkers$current_sep)
+
+class(data3$caseid)
+class(data3$sex)
+class(data3$area_residence)
+class(data3$current_sep)
+class(data3)
+
+```
+
+summary (biomarkers)
+str (biomarkers)
+targets
+
+```{r}
+outsave <- anesrake(targets, data3, caseid = data3$caseid,
+  verbose= FALSE, cap = 5, choosemethod = "total",
+  type = "pctlim", pctlim = .05 , nlim = 1,
+  iterate = TRUE , force1 = TRUE, na.rm = TRUE)
+```
+
+
+
+```{r}
+raking <- anesrake(sex,
+                    biomarkers,
+                    biomarkers$caseid,
+                    cap = 1,                      # Maximum allowed weight per iteration
+                    choosemethod = "total",       # How are parameters compared for selection?              # What selection criterion is used?
+                    pctlim = 0.01                 # Threshold for selection
+                    )
+#"Raking converged in 7 iterations"
+```
+
+
+
+biomarkers$caseid         <- as.factor(as.character(biomarkers$caseid))
+data3$sex            <- as.factor(as.character(data3$sex))
+data3$area_residence <- as.factor(as.character(data3$area_residence))
+data3$current_sep    <- as.factor(as.character(data3$current_sep))
+
+
+Attemp 2: using an alternative package 
+```{r}
+install_github("pewresearch/pewmethods", build_vignette = TRUE)
+```
+
+
+
+```{r}
+table(SABE_Colombia$socioeconomic_strata)
+Desc(SABE_Colombia$socioeconomic_strata)
+Desc(dfnonimputed$current_sep)
+Freq(SABE_Colombia$socioeconomic_strata)
+```
+
+
+get_totals("sex","area_residence", biomarkers, digits = 1)
+
+##Package two
+
+```{r}
+install.packages("pewmethods", dependencies = TRUE)
+library(pewmethods)
+```
+
+```{r}
+# will make sure a list's elements match the levels of the data it corresponds to
+reorder_list <- function(x, biomarkers){
+  new_list = list()
+  data_levels = levels(biomarkers)
+  for (level in levels(as.factor(biomarkers)))
+    new_list[[level]] = x[[level]]
+  return(new_list)
+}
+
+# calculates weights for data based on selected variables and their "true" margins
+rake_data <- function(biomarkers, targets, true_or_estimated_margins, max_iter=50, truncate_extreme_weights=TRUE){
+  weights = rep(1, nrow(biomarkers))
+
+  # calculate the sum and proportions of each variable + level in advance
+  # and make sure that order matches the same order in the data
+  total_margins = list()
+  for (variable in variables){
+    original_margins = true_or_estimated_margins[[targets]]
+    reordered_margins = reorder_list(original_margins, biomarkers[,"sex", "current_sep","area_residence"])
+
+    total_margin =  sum(unlist(reordered_margins[["sex", "current_sep","area_residence"]]))
+    total_margins[[variable]] = total_margin
+    for (level in names(true_or_estimated_margins[["sex", "current_sep","area_residence"]]))
+      reordered_margins[["sex", "current_sep","area_residence"]][[level]] =
+          reordered_margins[["sex", "current_sep","area_residence"]][[level]]/total_margin
+  }
+
+  # create design matrices (columns of 1s and 0s in this case) for faster calculations
+  design_matrices = list()
+  for (variable in variables){
+    # create model matrix with 0-intercept, which removes the concept of "reference variable"
+    design_matrices[["sex", "current_sep","area_residence"]] = as.data.frame(model.matrix(~.+0, data=biomarkers[,"sex", "current_sep","area_residence",drop=FALSE]))
+    # remove variable name from column name so only level remains
+    colnames(design_matrices[["sex", "current_sep","area_residence"]]) = substr(colnames(design_matrices), 1, nchar("sex", "current_sep","area_residence"))
+  }
+
+  # perform raking
+  for (i in 1:max_iter){
+    for (variable in variables){
+      weighted_margins = colSums(weights * design_matrices[["sex", "current_sep","area_residence"]])
+      level_weight_modifications = unlist(true_or_estimated_margins[["sex", "current_sep","area_residence"]])/weighted_margins
+
+      # this multiplies each column of the design matrices by the corresponding weight change factor
+      # then each column is multiplied by the weights, and the rows are added up, since each row only
+      # has one non-zero value
+      weights = rowSums(weights * mapply(`*`, design_matrices[["sex", "current_sep","area_residence"]], level_weight_modifications))
+    }
+  }
+
+  # limits extreme weights to median plus 6 times inter-quartile range
+  # IQR = difference between 75th percentile and 25th percentile of data
+  if (truncate_extreme_weights){
+    weight_threshold = median(weights) + 6*IQR(weights)
+    weights = pmin(weights, weight_threshold)
+  }
+  #normalize to population size
+  weights = weights*length(weights)/(sum(weights))
+
+  return(weights)
+}
+
+# formula in http://www.analyticalgroup.com/download/WEIGHTED_MEAN.pdf
+weighted.var.se <- function(x, w, na.rm=FALSE)
+{
+  x_weighted_mean = sum(x*w)/sum(w)
+  sum(w*(x-x_weighted_mean)^2)/(sum(w)-1)
+}
+
+# the error for the weighted mean estimate
+weighted.var.sigma <- function(x, w){
+  root_b = sqrt(sum(w)^2/sum(w^2))
+  weighted.var.se(x,w)/root_b
+}
+```
+
+
+Simulated data
+```{r}
+set.seed(525600)
+size_1 = 200
+example_data = data.frame(
+  sex=c("1","2")[1+rbinom(size_1, 1, 0.7)],
+  current_sep=sample(c('1','2','3'), size_1, replace=TRUE, prob=c(0.5,0.4,0.1))
+)
+
+actual_margins=list(sex=list('1'=0.51,'2'=0.49), current_sep=list('White'=0.7, 'Black'=0.15, 'Other'=0.15), area_residence =list('White'=0.7, 'Black'=0.15, 'Other'=0.15) )
+#low (53%), intermediate (40%), and high (7%)
+survey_weights = rake_data(example_data, c('sex','current_sep', 'area_residence'), actual_margins)
+
+example_data = example_data %>% mutate(random_score = 2+rnorm(size_1)/3 +
+                                         0.2*(gender=='F') -
+                                         0.25 * (race=='Other') +
+                                         0.35 * (race=='Black')
+)
+```
+
+Table particpant characteristics LSR report
+```{r}
+table1(~ factor(gender) + ethnic_group + area_residence + low_childhood_sep + household_violence + emotional_abuse + neglected_food + poor_health2 + early_infection + migration_yo2 + low_adult_sep + education + smoking + alcohol + physical_act + medication + hta + cvd + diabetes + obesity + cancer + mhdisorder | aces, data=dataBA2)
+```
+
+```{r}
+table1(~ factor(gender) + ethnic_group + area_residence + low_childhood_sep + household_violence + emotional_abuse + neglected_food + poor_health2 + early_infection + migration_yo2 + low_adult_sep + education + smoking + alcohol + physical_act + medication + hta + cvd + diabetes + obesity + cancer + mhdisorder | low_childhood_sep, data=dataBA2)
+```
