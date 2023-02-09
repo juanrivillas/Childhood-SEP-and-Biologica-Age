@@ -1,0 +1,327 @@
+---
+title: "meta_analysis parental SEP and inflammation"
+author: "Juan Rivillas"
+date: "02/02/2023"
+output: html_document
+---
+
+
+
+```{r}
+install.packages("meta")
+library(meta)
+library(readxl)
+```
+
+CRP
+```{r}
+setwd("~/Documents/PhD Project/Literature review/systematic review 1 inflammation")
+
+library(readxl)
+datacrp <- read_excel("Documents/PhD Project/Literature review/systematic review 1 inflammation/datacrp.xlsx")
+View(datacrp)
+
+View(datacrp)
+head(datacrp)
+```
+
+
+```{r}
+# datacrp$n_non_exposed     <- as.numeric(as.character(datacrp$n_non_exposed))
+# datacrp$n_exposed         <- as.numeric(as.character(datacrp$n_exposed))
+```
+
+
+```{r}
+# meta-analysis with continuout outcome
+# comb.fixed/comb.random: indicator whether a fix/random effect mata-analysis to be conducted.
+# sm: Three different types of summary measures to choose,standardized mean difference (SMD),mean difference (MD), ratio of means (ROM)
+res.crp =  metacont(n_exposed, mean_exposed, sd_exposed,
+n_non_exposed, mean_non_exposed, sd_non_exposed,
+comb.fixed = T, comb.random = T, studlab = Study,
+data = datacrp1, sm = "SMD")
+res.crp
+```
+
+
+Forest
+```{r}
+forest(res.crp, leftcols = c('studlab', 'Study_design', 'Year', 'Age', 'Sex', 'Exposure'))
+forest.meta(res.crp, leftcols = c('studlab', 'Year', 'Exposure'), layout = "RevMan5")
+forest.meta(res.crp, layout = "RevMan5")
+
+```
+Funnel Plot
+Metabias: Test for funnel plot asymmetry, based on rank correlation or linear regression method.
+
+```{r}
+funnel(res.crp)
+```
+
+
+Use Egger’s test to check publication bias, can take string ‘Egger’ or ‘linreg’.
+```{r}
+metabias(res.crp, method.bias = 'linreg', k.min = 7, plotit = T)
+```
+
+The p-value is 0.3843 which implies no publication bias. However, this meta-analysis contains k=7 studies. Egger’s test may lack the statistical power to detect bias when the number of studies is small (i.e., k<10).
+
+
+****IL-6*****
+
+library(readxl)
+datail6 <- read_excel("Documents/PhD Project/Literature review/systematic review 1 inflammation/datail6.xlsx")
+View(datail6)
+
+```{r}
+# meta-analysis with continuout outcome
+# comb.fixed/comb.random: indicator whether a fix/random effect mata-analysis to be conducted.
+# sm: Three different types of summary measures to choose,standardized mean difference (SMD),mean difference (MD), ratio of means (ROM)
+res.il6 =  metacont(n_exposed, mean_exposed, sd_exposed,
+n_non_exposed, mean_non_exposed, sd_non_exposed,
+comb.fixed = T, comb.random = T, studlab = Study,
+data = datail6, sm = "SMD")
+res.il6
+```
+
+
+```{r}
+forest(res.il6, leftcols = c('studlab', 'Study_design', 'Year', 'Age', 'Sex', 'Exposure'))
+forest.meta(res.il6, leftcols = c('studlab', 'Year', 'Exposure'), layout = "RevMan5")
+forest.meta(res.il6, layout = "RevMan5")
+```
+
+
+```{r}
+funnel(res.il6)
+```
+
+Use Egger’s test to check publication bias, can take string ‘Egger’ or ‘linreg’.
+```{r}
+metabias(res.il6, method.bias = 'linreg', k.min = 5, plotit = T)
+```
+
+
+****Allostatic Load****
+
+> library(readxl)
+> dataal <- read_excel("Documents/PhD Project/Literature review/systematic review 1 inflammation/dataal.xlsx")
+> View(dataal)  
+
+```{r}
+#dataal$mean_non_exposed     <- as.numeric(as.character(dataal$mean_non_exposed))
+#dataal$mean_exposed         <- as.numeric(as.character(dataal$mean_exposed))
+```
+
+
+```{r}
+# meta-analysis with continuout outcome
+# comb.fixed/comb.random: indicator whether a fix/random effect mata-analysis to be conducted.
+# sm: Three different types of summary measures to choose,standardized mean difference (SMD),mean difference (MD), ratio of means (ROM)
+res.al =  metacont(n_exposed, mean_exposed, sd_exposed,
+n_non_exposed, mean_non_exposed, sd_non_exposed,
+comb.fixed = T, comb.random = T, studlab = Study,
+data = dataal, sm = "SMD")
+res.al
+```
+
+
+```{r}
+forest(res.al, leftcols = c('studlab', 'Study_design', 'Year', 'Age', 'Sex', 'Exposure'))
+forest.meta(res.al, leftcols = c('studlab', 'Year', 'Exposure'), layout = "RevMan5")
+forest.meta(res.al, layout = "RevMan5")
+```
+
+
+```{r}
+funnel(res.al)
+```
+
+
+Use Egger’s test to check publication bias, can take string ‘Egger’ or ‘linreg’.
+```{r}
+metabias(res.al, method.bias = 'linreg', k.min = 3, plotit = T)
+```
+
+
+
+****DBP****
+```{r}
+library(readxl)
+datasbp <- read_excel("Documents/PhD Project/Literature review/systematic review 1 inflammation/datadbp.xlsx")
+View(datadbp)
+```
+
+
+```{r}
+# meta-analysis with continuout outcome
+# comb.fixed/comb.random: indicator whether a fix/random effect mata-analysis to be conducted.
+# sm: Three different types of summary measures to choose,standardized mean difference (SMD),mean difference (MD), ratio of means (ROM)
+res.dbp =  metacont(n_exposed, mean_exposed, sd_exposed,
+n_non_exposed, mean_non_exposed, sd_non_exposed,
+comb.fixed = T, comb.random = T, studlab = Study,
+data = datadbp, sm = "SMD")
+res.dbp
+```
+
+```{r}
+forest(res.dbp, leftcols = c('studlab', 'Study_design', 'Year', 'Age', 'Sex', 'Exposure'))
+forest.meta(res.dbp, leftcols = c('studlab', 'Year', 'Exposure'), layout = "RevMan5")
+forest.meta(res.dbp, layout = "RevMan5")
+```
+
+
+```{r}
+funnel(res.dbp)
+```
+
+
+
+Use Egger’s test to check publication bias, can take string ‘Egger’ or ‘linreg’.
+```{r}
+metabias(res.dbp, method.bias = 'linreg', k.min = 4, plotit = T)
+```
+
+
+#####RUN UNTIL HERE######
+
+Total cholesterol
+
+```{r}
+library(readxl)
+datatchol <- read_excel("Documents/PhD Project/Literature review/systematic review 1 inflammation/datatchol.xlsx")
+View(datatchol)
+```
+
+
+```{r}
+# meta-analysis with continuout outcome
+# comb.fixed/comb.random: indicator whether a fix/random effect mata-analysis to be conducted.
+# sm: Three different types of summary measures to choose,standardized mean difference (SMD),mean difference (MD), ratio of means (ROM)
+res.tchol =  metacont(n_exposed, mean_exposed, sd_exposed,
+n_non_exposed, mean_non_exposed, sd_non_exposed,
+comb.fixed = T, comb.random = T, studlab = Study,
+data = datatchol, sm = "SMD")
+res.tchol
+```
+
+```{r}
+forest(res.tchol, leftcols = c('studlab', 'Study_design', 'Year', 'Age', 'Sex', 'Exposure'))
+```
+
+```{r}
+funnel(res.tchol)
+```
+
+LDL
+```{r}
+library(readxl)
+dataldl <- read_excel("Documents/PhD Project/Literature review/systematic review 1 inflammation/dataldl.xlsx")
+View(dataldl)
+```
+
+
+```{r}
+# meta-analysis with continuout outcome
+# comb.fixed/comb.random: indicator whether a fix/random effect mata-analysis to be conducted.
+# sm: Three different types of summary measures to choose,standardized mean difference (SMD),mean difference (MD), ratio of means (ROM)
+res.ldl =  metacont(n_exposed, mean_exposed, sd_exposed,
+n_non_exposed, mean_non_exposed, sd_non_exposed,
+comb.fixed = T, comb.random = T, studlab = Study,
+data = dataldl, sm = "SMD")
+res.ldl
+```
+
+
+```{r}
+forest(res.ldl, leftcols = c('studlab', 'Study_design', 'Year', 'Age', 'Sex', 'Exposure'))
+```
+
+
+```{r}
+funnel(res.ldl)
+```
+
+
+
+HDL
+library(readxl)
+datahdl <- read_excel("Documents/PhD Project/Literature review/systematic review 1 inflammation/datahdl.xlsx")
+View(datahdl)
+
+```{r}
+# meta-analysis with continuout outcome
+# comb.fixed/comb.random: indicator whether a fix/random effect mata-analysis to be conducted.
+# sm: Three different types of summary measures to choose,standardized mean difference (SMD),mean difference (MD), ratio of means (ROM)
+res.hdl =  metacont(n_exposed, mean_exposed, sd_exposed,
+n_non_exposed, mean_non_exposed, sd_non_exposed,
+comb.fixed = T, comb.random = T, studlab = Study,
+data = datahdl, sm = "SMD")
+res.ldl
+```
+
+
+```{r}
+forest(res.hdl, leftcols = c('studlab', 'Study_design', 'Year', 'Age', 'Sex', 'Exposure'))
+```
+
+
+```{r}
+funnel(res.hdl)
+```
+
+WC
+library(readxl)
+datawc <- read_excel("Documents/PhD Project/Literature review/systematic review 1 inflammation/datawc.xlsx")
+View(datawc)
+
+```{r}
+# meta-analysis with continuout outcome
+# comb.fixed/comb.random: indicator whether a fix/random effect mata-analysis to be conducted.
+# sm: Three different types of summary measures to choose,standardized mean difference (SMD),mean difference (MD), ratio of means (ROM)
+res.wc =  metacont(n_exposed, mean_exposed, sd_exposed,
+n_non_exposed, mean_non_exposed, sd_non_exposed,
+comb.fixed = T, comb.random = T, studlab = Study,
+data = datawc, sm = "SMD")
+res.wc
+```
+
+
+```{r}
+forest(res.wc, leftcols = c('studlab', 'Study_design', 'Year', 'Age', 'Sex', 'Exposure'))
+```
+
+```{r}
+funnel(res.wc)
+```
+
+
+
+****** 
+
+```{r}
+datasbp$n_non_exposed     <- as.numeric(as.character(datasbp$n_non_exposed))
+datasbp$n_exposed         <- as.numeric(as.character(datasbp$n_exposed))
+```
+
+
+
+
+
+
+
+
+```{r}
+dataparental_sep$n_non_exposed     <- as.numeric(as.character(dataparental_sep$n_non_exposed))
+dataparental_sep$n_exposed         <- as.numeric(as.character(dataparental_sep$n_exposed))
+dataparental_sep$mean_exposed      <- as.numeric(as.character(dataparental_sep$mean_exposed))
+dataparental_sep$mean_non_exposed  <- as.numeric(as.character(dataparental_sep$mean_non_exposed))
+```
+
+
+
+
+
+
+
+
