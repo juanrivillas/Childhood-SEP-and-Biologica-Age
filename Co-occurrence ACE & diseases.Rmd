@@ -1,121 +1,95 @@
 ---
-title: "Untitled"
-output: html_document
+title: "Co-occurrence ACEs and diseases"
+author: "Juan Rivillas"
+date: "03/03/2023"
+output:
+  word_document: default
+  html_document: default
 ---
 
-```{r setup, include=FALSE}
-dfsabe_pathways2$ACEs <- factor(dfsabe_pathways2$ACEs,
-                         levels = c("1", "2", "3"),
-                         labels = c("Moderate risk ACEs", "High-risk ACEs", "Low-risk ACEs"))
 
-Desc(dfsabe_pathways2$ACEs, useNAs=always)
-
-library(boot)
-
-# Create a bootstrap function
-boot_func <- function(data, i) {
-  # Sample the data with replacement
-  sample_data <- sample(pathways_final, replace = TRUE)
-
-  # Fit the model to the sampled data
-  mod_boot <- lm(formula = Obesity ~ ACEs + age + sex + ethnic_group, data = pathways_final)
-
-  # Return the coefficient of interest
-  return(mod_boot$coefficients["age"])
-}
-
-# Bootstrap the data 1000 times
-boot_results <- boot(data = pathways_final, statistic = boot_func, R = 1000)
-
-# Compute the 95% bootstrap confidence interval
-boot_ci <- boot.ci(boot_results, conf.level = 0.95)
-
-# Print the confidence interval
-print(boot_ci)
-
-```
+#This R Marckdown included: i) Estimation adjusted Odd Ratios for confunders (ACES -> diseases)
+ii) Construction sankey diagrams
 
 
-```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r cars}
-Desc(dfsabe_pathways2$ACEs, useNAs=always)
-Desc(pathways_final$ACEs, useNAs=always)
-Desc(pathways_final$ethnic_group2, useNAs=always)
-Desc(pathways_final$sex2, useNAs=always)
-Desc(pathways_final$ACEs2, useNAs=always)
+install.packages('table1')
+library(table1)
 
-install.packages ('tydiverse')
+install.packages('epiR') #Tools for the Analysis of Epidemiological Data
+library(epiR)
 
-skimr::skim(dfsabe_pathways2)
+install.packages('caret')
+library(epiR)
+
+install.packages('car')
+library(car)
+
+install.packages('compareGroups')
+library(compareGroups)
+
+#install.packages('InformationValue')
+#library(InformationValue)
+
+#help("package_version"="InformationValue")
+
+install.packages ('networkD3')
+library(networkD3)
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+##Step 1: Load the Data
+#For this example, we’ll use the SABE aging population survey dataset from overall of biomarkers. 
+```{r}
+#load dataset
+pathways_final
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+#view summary of dataset
+summary(pathways_final)
+
+#find total observations in dataset
+nrow(pathways_final)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
-
-```{r pressure, echo=FALSE}
 
 
-# create a data frame with categorical variables of ACEs.
-pathways_final <- data.frame(
-    childhood_migration = factor(c("Yes","No")),
-    emotional_abuse.y = factor(c("Yes","No")),
-    poor_childhood_health = factor(c("Yes","No")),
-    poor_food_environment = factor(c("Yes","No")),
-    domestic_violence = factor(c("Yes","No")),
-    early_infection = factor(c("Yes","No"))
+#Individual ACEs
+
+Extract descriptive data
+```{r}
+table_2 <-table1 (~age + ethnic_group + emotional_abuse + poor_food_environment + poor_childhood_health + domestic_violence + childhood_migration + early_infection + HTA + CVD + Diabetes + Obesity + ACE_score + Low_childhood_sep + Adult_sep | sex, data=pathways_final)
+
+table_2
+```
 
 
-# Prepare your data and 
-pathways_final$childhood_migration    <- as.numeric(as.character(pathways_final$childhood_migration))
-pathways_final$emotional_abuse.y      <- as.numeric(as.character(pathways_final$emotional_abuse.y))
-pathways_final$poor_childhood_health  <- as.numeric(as.character(pathways_final$poor_childhood_health))
-pathways_final$poor_food_environment  <- as.numeric(as.character(pathways_final$poor_food_environment))
-pathways_final$domestic_violence      <- as.numeric(as.character(pathways_final$domestic_violence))
-pathways_final$early_infection        <- as.numeric(as.character(pathways_final$early_infection))
+
+#co-occurence ACES
+```{r}
+test_compare2 <- compareGroups( data = pathways_final, 
+               formula = emotional_abuse  ~ 
+               emotional_abuse + poor_food_environment + poor_childhood_health + domestic_violence + childhood_migration + early_infection + Low_childhood_sep)
+
+test_compare2 
+
+test_table5 <- createTable( test_compare2, show.ci = TRUE )
+
+test_table5
+```
+```
+
+
+#ACEs score
 
 #Create a new category for the ACEs variables.
-pathways_final <- pathways_final %>%
-  mutate(ACE_score = case_when(
-      sum(c(childhood_migration.x, emotional_abuse.x, poor_health2, neglected_food, household_violence, early_infection.x)) == 0 ~ "ACE_0",
-      sum(c(childhood_migration.x, emotional_abuse.x, poor_health2, neglected_food, household_violence, early_infection.x)) == 1 ~ "ACE_1",
-      sum(c(childhood_migration.x, emotional_abuse.x, poor_health2, neglected_food, household_violence, early_infection.x)) == 2 ~ "ACE_2",
-      sum(c(childhood_migration.x, emotional_abuse.x, poor_health2, neglected_food, household_violence, early_infection.x)) == 3 ~ "ACE_3",
-      TRUE ~ "ACE_4_or_more"
-  ))
-
-
-# Sum the categorical variables of ACEs in the new category.
-data_sum <- pathways_final %>%
-  group_by(ACE_score) %>%
-  summarize(count = n())
-
-
-# View the results.
-head(data_sum)
-
-*******
-
+```{r}
 pathways_final$aces_score <- pathways_final$childhood_migration.x + pathways_final$emotional_abuse.x + pathways_final$poor_health2 + pathways_final$neglected_food + pathways_final$household_violence + pathways_final$early_infection.x
 
 
-Desc(pathways_final$aces_score)
-levels(pathways_final$aces_score)
 
-#create a vector co-morbidities
+#create a vector aces score
 pathways_final$aces_score <- factor(pathways_final$aces_score,
                 levels = c("0","1","2","3","4","5","6"),
                 labels = c("ACE 0","ACE 1", "ACE 2","ACE 3", "+ 4 ACE","+ 4 ACE", "+ 4 ACE"))
@@ -123,62 +97,1016 @@ pathways_final$aces_score <- factor(pathways_final$aces_score,
 Desc(pathways_final$aces_score)
 ```
 
-install.packages("psych")
-library(psych)
-
-# Prepare your data as factors
-tetrachoric_correlation$childhood_migration    <- as.factor(as.character(tetrachoric_correlation$childhood_migration))
-tetrachoric_correlation$emotional_abuse        <- as.factor(as.character(tetrachoric_correlation$emotional_abuse))
-tetrachoric_correlation$poor_childhood_health  <- as.factor(as.character(tetrachoric_correlation$poor_childhood_health))
-tetrachoric_correlation$poor_food_environment  <- as.factor(as.character(tetrachoric_correlation$poor_food_environment))
-tetrachoric_correlation$domestic_violence      <- as.factor(as.character(tetrachoric_correlation$domestic_violence))
-tetrachoric_correlation$early_infection        <- as.factor(as.character(tetrachoric_correlation$early_infection))
-tetrachoric_correlation$Low_childhood_sep      <- as.factor(as.character(tetrachoric_correlation$Low_childhood_sep))
-
-# Calculate the tetrachoric correlations between all pairs of ACE variables.
-tetrachoric_correlations <- tetrachoric(tetrachoric_correlation)
+#Descriptive analysis of latentt groups
 
 ```{r}
-# Calculate the correlation coefficients between all pairs of ACE variables.
-tetrachoric_correlations <- polychoric(tetrachoric_correlation)
+#Characteristics ACEs
+table_3 <-table1 (~age + sex + ethnic_group + area_residence.y + emotional_abuse + poor_food_environment + poor_childhood_health + early_infection + domestic_violence + childhood_migration  | ACE_score, data=pathways_final)
+table_3
 
-# View the results.
-tetrachoric_correlations
-```
-
-
-```{r}
-Desc(pathways_final$aces_score)
-```
-
-
-```{r}
-p <- pathways_final %>% 
-  group_by(sex) %>% 
-  plot_frq(ACE_score) %>%
-    plot_grid()
-
-q <- pathways_final %>% 
-  group_by(sex) %>% 
-  plot_frq(ACEs) %>%
-    plot_grid()
-    
-save_plot(filename = "ace_Score_sex.jpg", fig = p, width = 30, height = 19)
-save_plot(filename = "lca_ace_sex.jpg", fig = q, width = 30, height = 19)
+#Latent groups and outcomes
+table_4 <-table1 (~age + sex + ethnic_group + HTA + CVD + Diabetes + Obesity + ACEs + Low_childhood_sep + Adult_sep | ACE_score, data=pathways_final)
+table_4
 
 ```
 
 
+#Correlation analysis
+
+install.packages("compareGroups")
+library("compareGroups")
 
 ```{r}
-plot_model(m, show.values = TRUE, width = 0.1)+
-  ylab("Increase in salary as compared to no education")```
+test_compare2 <- compareGroups( data = data_male, 
+               formula = HTA  ~ 
+               emotional_abuse + poor_food_environment + poor_childhood_health + domestic_violence + childhood_migration + early_infection + ACE_score + ACEs + Low_childhood_sep + Adult_sep)
+
+test_compare2 
+
+test_table5 <- createTable( test_compare2, show.ci = TRUE )
+
+test_table5
+```
+
+```{r}
+test_compare3 <- compareGroups( data = pathways_final, 
+               formula = CVD  ~ 
+               emotional_abuse + poor_food_environment + poor_childhood_health + domestic_violence + childhood_migration + early_infection + ACE_score + ACEs + Low_childhood_sep + Adult_sep)
+
+test_compare3 
+
+test_table3 <- createTable( test_compare3, show.ci = TRUE )
+
+test_table3
+```
+
+```{r}
+test_compare4 <- compareGroups( data = pathways_final, 
+               formula = Diabetes  ~ 
+               emotional_abuse + poor_food_environment + poor_childhood_health + domestic_violence + childhood_migration + early_infection + ACE_score + ACEs + Low_childhood_sep + Adult_sep)
+
+test_compare4 
+
+test_table4 <- createTable( test_compare4, show.ci = TRUE )
+
+test_table4
+```
 
 
 ```{r}
-plot_grpfrq(
-  var.cnt = pathways_final$ACEs, 
-  var.grp = pathways_final$ACE_score)
+test_compare1 <- compareGroups( data = pathways_final, 
+               formula = Obesity  ~ 
+               emotional_abuse + poor_food_environment + poor_childhood_health + domestic_violence + childhood_migration + early_infection + ACE_score + ACEs + Low_childhood_sep + Adult_sep)
+
+test_compare1 
+
+test_table1 <- createTable( test_compare1, show.ci = TRUE )
+
+test_table1
+```
+
+#Co-occurring ACE using corrlation matrix
+```{r}
+## as a default this function outputs a correlation matrix plot
+ggcorrmat(
+  data     = tetrachoric_correlation1,
+  colors   = c("#B2182B", "white", "#4D4D4D"),
+  title    = "Descriptive co-occurrence of childhood adversities ",
+  subtitle = "Tetrachroric correlation using a correlalogram"
+)
+```
+
+
+
+#This dataset contains the following information about 18044 individuals:
+#We will use adversity in childhood and adult diseases to build a logistic regression model that predicts the probability that a given individual develop hypertension, obesity, cardiovascular diseases, or diabetes.
+
+##Step 2: Create Training and Test Samples
+Next, we’ll split the dataset into a training set to train the model on and a testing set to test the model on.
+
+```{r}
+#make this example reproducible
+set.seed(1)
+
+#Use 70% of SABE survey dataset as training set and remaining 30% as testing set
+sample <- sample(c(TRUE, FALSE), nrow(pathways_final), replace=TRUE, prob=c(0.7,0.3))
+train <- pathways_final[sample, ]
+test <- pathways_final[!sample, ]  
+```
+
+
+##Step 3: Explore relationship between ACEs and diseases
+```{r}
+#Using TAB command
+TAB <- table (pathways_final$ACEs, pathways_final$BMI)
+TAB
+
+barplot(TAB, beside = T, legend=T)
+
+epi.2by2 (TAB, method="cross.sectional", conf.level=0.95)
+
+1/1.04
+
+```
+
+#RLogistic regression by exposure-outcome-sex
+
+```{r}
+# Load the necessary libraries.
+library(dplyr)
+library(glm)
+```
+
+1. **Prepare your data.**
+```{r}
+# Split the data by sex.
+data_male <- pathways_final %>% filter(sex == "Male")
+data_female <- pathways_final %>% filter(sex == "Female")
+```
+
+2. Fit a logistic regression model for each sex.
+```{r}
+model_male <- glm(HTA ~ ACE_score +age, data = data_male, family = "binomial")
+model_female <- glm(HTA ~ ACE_score, data = data_female, family = "binomial")
+```
+
+3. Predict the probability of disease for each sex.
+```{r}
+prediction_male <- predict(model_male, data_male, type = "response")
+prediction_female <- predict(model_female, data_female, type = "response")
+```
+
+# Evaluate the performance of the models.
+# ...
+
+```{r}
+prediction_male
+```
+
+# Interpret the results.
+# ...
+
+
+
+
+
+
+```{r}
+m6 <- glm(
+  HTA ~ ACE_score + age, data = data_male, family = binomial(logit)
+)
+summary(m6)
+```
+
+
+```{r}
+# converting admit and rank
+# columns into factor variables
+pathways_final$HTA = as.factor(pathways_final$HTA)
+pathways_final$Diabetes = as.factor(pathways_final$Diabetes)
+pathways_final$CVD = as.factor(pathways_final$CVD)
+pathways_final$Obesity = as.factor(pathways_final$Obesity)
+
+
+odds_hta <- glm(HTA ~  ACEs + age + sex, data = pathways_final, family = binomial(logit))
+odds_hta
+```
+
+Interpretation of the outcome (here displys more information): 
+The coefficients in the output indicate the average change in log odds of hypertension. For example, not being exposed to adverse childhood is associated with an average decrease of -0.03396 in the log odds of hypertension.
+
+
+```{r}
+#fit logistic regression model (another way to build your models)
+model <- glm(HTA ~  ACEs + age + sex + ethnic_group, family="binomial", data=pathways_final)
+
+#disable scientific notation for model summary
+options(scipen=999)
+
+#view model summary
+summary(model)
+```
+
+Interpretation of the outcome: 
+The coefficients in the output indicate the average change in log odds of HTA. For example, i) being male is associated with an average decrease of -0.545886 in the log odds of HT: and ii) a one unit increase in age is associated with an average increase of 0.042667 in the log odds of hypertension.
+
+
+The p-values in the output also give us an idea of how effective each predictor variable is at predicting the probability of developing hypertension:
+
+P-value of aces:   0.736855
+P-value of age:    <0.0000
+P-value of gender: <0.0000  (male)
+P-value of race:   0.00069 (indigenous)
+
+We can see that age, gender and race seem to be important predictors since they have low p-values while adverse childhood is not nearly as important.
+
+#Assessing Model Fit:
+we can compute a metric known as McFadden’s R2, which ranges from 0 to just under 1. Values close to 0 indicate that the model has no predictive power. In practice, values over 0.40 indicate that a model fits the data very well.
+
+We can compute McFadden’s R2 for our model using the pR2 function from the pscl package:
+
+```{r}
+pscl::pR2(model)["McFadden"]
+```
+
+A value of 0.02933238  is quite low for McFadden’s R2, which indicates that our model doesn't fits the data very well and hasn't high predictive power.
+
+#Variable Importance:
+
+We can also compute the importance of each predictor variable in the model by using the varImp function from the caret package:
+We can also calculate the VIF values of each variable in the model to see if multicollinearity is a problem:
+```{r}
+#Contribution of each predictor
+caret::varImp(model)
+
+#calculate VIF values for each predictor variable in our model
+car::vif(model)
+```
+
+Variable Importance (interpretation): Higher values indicate more importance. These results match up nicely with the p-values from the model. Age and gender male is by far the most important predictor variables, followed by ethnicity indigenous and then mestize.
+
+VIF (interpretation): VIF values above 5 indicate severe multicollinearity. Since none of the  predictor variables in our models have a VIF over 5, we can assume that multicollinearity is not an issue in our model.
+
+
+Step 4: Use the Model to Make Predictions
+Once we’ve fit the logistic regression model, we can then use it to make predictions about whether or not an individual will develop hypertension based on their childhood adversity, age, gender and ethnicity:
+
+```{r}
+#define two individuals
+new <- data.frame(aces = c("High-risk"), age =60, gender = c("female"), ethnic_group = c("white"))
+
+#predict probability of defaulting
+predict(model, new, type="response")
+```
+
+Interpretation of the outcome: 
+The probability of an individual with 60 years old and afrocolombian female and exposed to high-risk of aces has a probability of developing hypertension of .6029637. Conversely, an white female with the age and exposed to aces has a probability of developing hta of 0.5084821. 
+
+We can use the following code to calculate the probability of developing hypertension for every individual in our test dataset:
+
+```{r}
+#calculate probability of default for each individual in test dataset
+predicted <- predict(model, test, type="response")
+```
+
+Step 5: Model Diagnostics (pending)
+
+Another option summarising different models
+
+```{r}
+# full model
+mod0 <- glm(hta ~ aces*age*gender*ethnic_group, data=dataBA2, family=binomial(link="logit"))
+summary(mod0)
+
+# full model minus four-way interaction
+mod1 <- glm(hta ~ aces*age*gender*ethnic_group - aces:age:gender:ethnic_group, data=dataBA2, family=binomial(link="logit"))
+summary(mod1)
+
+# v1:v4 as only interaction
+mod2 <- glm(hta ~ aces+age+gender+ethnic_group + aces:age:gender:ethnic_group, data=dataBA2, family=binomial(link="logit"))
+summary(mod2)
+
+anova(mod0, mod1, mod2)
+
+# odds ratio coefficients and confidence intervals
+library(MASS)
+exp(cbind(coef(mod2), confint(mod2)))
+
+```
+
+
+
+#Addressing confounding using Mantel-Haenszel adjusted odds ratio
+We’re concerned that the gender and race may confound the association between childhood adversity and hypertension in adulthood so we’ll stratify the data by race and gender and compute the Mantel-Haenszel adjusted odds ratio. As before, our tables can be prepared using either base R or tidyverse.
+
+```{r}
+#Stratified two by two table preparation using the table function in base R (ACES)
+TAB_hta_gen  <- table (dataBA2$aces, dataBA2$hta, dataBA2$gender)
+TAB_diabetes <- table (dataBA2$aces, dataBA2$diabetes,dataBA2$gender)
+TAB_cvd      <- table (dataBA2$aces, dataBA2$cvd,dataBA2$gender)
+TAB_obesity  <- table (dataBA2$aces, dataBA2$obesity, dataBA2$gender)
+
+#Stratified two by two table preparation using the table function in base R (Childhood SEP)
+TAB_hta_sep      <- table (dataBA2$low_childhood_sep, dataBA2$hta, dataBA2$gender)
+TAB_diabetes_sep <- table (dataBA2$low_childhood_sep, dataBA2$diabetes, dataBA2$gender)
+TAB_cvd_sep      <- table (dataBA2$low_childhood_sep, dataBA2$cvd, dataBA2$gender)
+TAB_obesity_sep  <- table (dataBA2$low_childhood_sep, dataBA2$obesity, dataBA2$gender)
+
+TAB_hta_race <- table (dataBA2$aces, dataBA2$hta, dataBA2$ethnic_group)
+
+TAB_hta_gen
+TAB_hta_race
+
+```
+
+ACES AND DISEASES
+
+```{r}
+test_compare4 <- compareGroups( data = pathways_final, 
+               formula = Diabetes  ~ 
+               emotional_abuse + poor_food_environment + poor_childhood_health + domestic_violence + childhood_migration + early_infection + ACE_score + ACEs + Low_childhood_sep + Adult_sep)
+
+test_compare4 
+
+test_table4 <- createTable( test_compare4, show.ci = TRUE )
+
+test_table4
+
+```
+
+
+```{r}
+test_compare4 <- compareGroups( data = pathways_final, 
+               formula = CVD  ~ 
+               emotional_abuse + poor_food_environment + poor_childhood_health + domestic_violence + childhood_migration + early_infection + ACE_score + ACEs + Low_childhood_sep + Adult_sep)
+
+test_compare4 
+
+test_table4 <- createTable( test_compare4, show.ci = TRUE )
+
+test_table4
+
+```
+
+
+```{r}
+test_compare4 <- compareGroups( data = pathways_final, 
+               formula = HTA  ~ 
+               emotional_abuse + poor_food_environment + poor_childhood_health + domestic_violence + childhood_migration + early_infection + ACE_score + ACEs + Low_childhood_sep + Adult_sep)
+
+test_compare4 
+
+test_table4 <- createTable( test_compare4, show.ci = TRUE )
+
+test_table4
+
+```
+
+
+```{r}
+test_compare4 <- compareGroups( data = pathways_final, 
+               formula = Obesity  ~ 
+               emotional_abuse + poor_food_environment + poor_childhood_health + domestic_violence + childhood_migration + early_infection + ACE_score + ACEs + Low_childhood_sep + Adult_sep)
+
+test_compare4 
+
+test_table4 <- createTable( test_compare4, show.ci = TRUE )
+
+test_table4
+
+```
+
+
+Compute the Mantel-Haenszel adjusted odds ratio for exposure and disease, adjusting for the effect of gender and race. Function epi.2by2 automatically calculates the Mantel-Haenszel odds ratio and risk ratio when presented with stratified contingency tables.
+
+```{r}
+#childhood adversity#
+#Adjusted OR for gender hta
+dat.epi05 <- epi.2by2(dat = TAB_hta_gen, method = "cross.sectional", 
+   conf.level = 0.95, units = 100, interpret = FALSE, outcome = "as.columns")
+dat.epi05
+
+#Adjusted OR for gender cvd
+dat.epi06 <- epi.2by2(dat = TAB_cvd, method = "cross.sectional", 
+   conf.level = 0.95, units = 100, interpret = FALSE, outcome = "as.columns")
+dat.epi06
+
+#Adjusted OR for gender diabetes
+dat.epi07 <- epi.2by2(dat = TAB_diabetes, method = "cross.sectional", 
+   conf.level = 0.95, units = 100, interpret = FALSE, outcome = "as.columns")
+dat.epi07
+
+#Adjusted OR for gender obesity
+dat.epi08 <- epi.2by2(dat = TAB_obesity, method = "cross.sectional", 
+   conf.level = 0.95, units = 100, interpret = FALSE, outcome = "as.columns")
+dat.epi08
+
+
+
+#Low childhood SEP#
+#Adjusted OR for gender hta
+dat.epi09 <- epi.2by2(dat = TAB_hta_sep, method = "cross.sectional", 
+   conf.level = 0.95, units = 100, interpret = FALSE, outcome = "as.columns")
+dat.epi09
+
+#Adjusted OR for gender cvd
+dat.epi10 <- epi.2by2(dat = TAB_cvd_sep, method = "cross.sectional", 
+   conf.level = 0.95, units = 100, interpret = FALSE, outcome = "as.columns")
+dat.epi10
+
+#Adjusted OR for gender diabetes
+dat.epi11 <- epi.2by2(dat = TAB_diabetes_sep, method = "cross.sectional", 
+   conf.level = 0.95, units = 100, interpret = FALSE, outcome = "as.columns")
+dat.epi11
+
+#Adjusted OR for gender obesity
+dat.epi12 <- epi.2by2(dat = TAB_obesity_sep, method = "cross.sectional", 
+   conf.level = 0.95, units = 100, interpret = FALSE, outcome = "as.columns")
+dat.epi12
+
+#tab_model(dat.epi12, file = "plot.html")
+
+
+#Adjusted OR for race
+dat.epi05 <- epi.2by2(dat = TAB_hta_race, method = "cross.sectional", 
+   conf.level = 0.95, units = 100, interpret = FALSE, outcome = "as.columns")
+dat.epi05
+```
+*Interpretation of the outcome (adjusted for gender): The Mantel-Haenszel test of homogeneity of the strata odds ratios is not significant (OR=0.051; p-value = 0.411). We accept the null hypothesis and conclude that the odds ratios for each strata of gender are the same. Because the stratum specific odds ratios are not significantly different the Mantel-Haenszel adjusted odds ratio provides an appropriate summary of the association between childhood adversity and hypertension.
+
+After accounting for the confounding effect of gender, the odds of having a hypertension in later life for individuals exposed to adverse childhood experiences was 1.02 (95% CI 0.84 to 1.24) times that of non-exposed.
+
+
+
+##################################################################################
+#####################ANALYSIS REGRESSION ACES-DISEASES PAPER 2####################
+##################################################################################
+#option 3 logistic regression table and plot
+Given their ease of calculation and simplicity, odds ratios are used near universally in medical reporting. While many researchers still prefer the tabular format to report ORs, the odds ratio plots, or forest plots, have recently come into vogue. There are many ways to generate OR plot in R, but the one that I find to be most intuitive and least onerous is the ‘finalfit’ package.
+
+Plot the individual strata odds ratios and the Mantel-Haenszel summary odds ratio as an error bar plot to better understand how the Mantel-Haenszel adjusted odds ratio relates to the individual strata odds ratios.
+
+Here is a quick demonstration:
+
+First, let’s look at associations between our explanatory variable of interest (exposure) and other explanatory variables.
+
+#1. Load the necessary libraries. for the analysis
+```{r}
+install.packages("finalfit")
+install.packages("glm")
+library(finalfit)
+library(glm)
+
+library(tidyverse)
+library(finalfit)
+library (dplyr)
+
+# install.packages("devtools")
+devtools::install_github("r-lib/conflicted")
+
+#RLogistic regression by exposure-outcome-sex
+library(dplyr)
+
+library(glm)
+
+#CochranArmitageTest {DescTools}
+install.packages("DescTools")
+library(DescTools)
+
+```
+
+#2. Prepare data and split it by sex (Explore sex differences)
+```{r}
+data_male <- pathways_final %>% filter(sex == "Male")
+data_female <- pathways_final %>% filter(sex == "Female")
+```
+
+#3. Save two datasets males and females
+```{r}
+writexl::write_xlsx( x = data_male, path =  '/Users/macbookpro/Documents/PhD Project/Data/SABE/dataframes/data_male.xlsx' )
+
+writexl::write_xlsx( x = data_female, path =  '/Users/macbookpro/Documents/PhD Project/Data/SABE/dataframes/data_female.xlsx' )
+```
+
+
+#4. Change to factor for the regressions 
+```{r}
+data_male$Obesity  = as.factor(data_male$Obesity)
+data_male$HTA      = as.factor(data_male$HTA)
+data_male$Diabetes = as.factor(data_male$Diabetes)
+data_male$CVD      = as.factor(data_male$CVD)
+
+data_male$sex2     = as.factor(data_male$sex2)
+data_male$ACEs2    = as.factor(data_male$ACEs2)
+data_male$ethnic_group2   = as.factor(data_male$ethnic_group2)
+data_male$aces_score   = as.factor(data_male$aces_score)
+data_male$ACE_score   = as.factor(data_male$ACE_score)
+
+```
+
+
+#5. Change the reference category using relevel((reference=advantage groups))  
+
+```{r}
+#What you can do is change it to an ordinary factor:
+sex2 <- factor(dataBA2$gender, levels=c("female","male"))
+ethnic_group2 <- factor(dataBA2$ethnic_group, levels=c("afrocolombian","mestize","white", "indigenous","other"))
+ACEs2 <- factor(dataBA2$Childhood_adversity, levels=c("High-risk","Low-risk"))
+
+
+Freq(pathways_final$ethnic_group2)
+
+pathways_final$sex2 <- factor(pathways_final$sex,
+                levels = c("Female","Male"),
+                labels = c("2", "1"))
+
+pathways_final$ACEs2 <- factor(pathways_final$ACEs,
+                levels = c(Low-risk", "Moderate risk ACEs", "High-risk"),
+                labels = c("1", "2", "3"))
+
+pathways_final$ethnic_group2 <- factor(pathways_final$ethnic_group,
+                levels = c("Afrocolombian","DK response", "Indigenous", "Mestize", "Other", "White"),
+                labels = c("2","3","4","5","6","1"))
+
+
+sex2 <- factor(dataBA2$sex2, levels=c("1","2"))
+ethnic_group2 <- factor(dataBA2$ethnic_group2, levels=c("2","3", "4","5", "6","1"))
+ACEs2 <- factor(dataBA2$Childhood_adversity, levels=c("1","2","3"))
+
+#If we realized, we need to re-parametizer the model (putting always reference the wealthiest groups)
+data_male <- within (data_male, ACEs2 <- relevel (ACEs2, ref = '1'))
+data_male <- within (data_male, sex2 <- relevel (sex2, ref = '1'))
+data_male <- within (data_male, ethnic_group2 <- relevel (ethnic_group2, ref = '1'))
+data_male <- within (data_male, aces_score <- relevel (aces_score, ref = '1'))
+data_male <- within (data_male, ACE_score <- relevel (ACE_score, ref = 'ACE 0'))
+
+table(data_male$ACEs2)
+table(data_male$sex2)
+table(data_male$ethnic_group2)
+table(data_male$aces_score)
+```
+
+
+#6. Specify explanatory variables of interest. Graphics OR for males
+
+```{r}
+iv <- c("ACE_score","age", "ethnic_group2")
+dv <- "Diabetes"
+
+data_male %>% or_plot(dv, iv)
+
+table2 <- data_male %>%
+finalfit(dv, iv,dependent_label_prefix = "")
+
+table2
+```
+
+#Specify explanatory variables of interest. Graphics OR for males
+```{r}
+iv <- c("ACE_score","age", "ethnic_group2")
+dv <- "CVD"
+
+data_male %>% or_plot(dv, iv)
+
+table2 <- data_male %>%
+finalfit(dv, iv,dependent_label_prefix = "")
+
+table2
+```
+
+#Specify explanatory variables of interest. Graphics OR for males
+```{r}
+iv <- c("ACE_score","age", "ethnic_group2")
+dv <- "HTA"
+
+data_male %>% or_plot(dv, iv)
+
+table2 <- data_male %>%
+finalfit(dv, iv,dependent_label_prefix = "")
+
+table2
+```
+
+#Specify explanatory variables of interest. Graphics OR for males
+```{r}
+iv <- c("ACE_score","age", "ethnic_group2")
+dv <- "Obesity"
+
+data_male %>% or_plot(dv, iv)
+
+table2 <- data_male %>%
+finalfit(dv, iv,dependent_label_prefix = "")
+
+table2
+```
+
+Perform a Cochran Armitage test for trend in binomial proportions across the levels of a single variable. This test is appropriate only when one variable has two levels and the other variable is ordinal. The two-level variable represents the response, and the other represents an explanatory variable with ordered levels. The null hypothesis is the hypothesis of no trend, which means that the binomial proportion is the same for all levels of the explanatory variable.
+
+```{r}
+tab8 <- table(data_male$ACE_score, data_male$Diabetes)
+CochranArmitageTest(tab8)
+```
+
+```{r}
+tab5 <- table(data_male$ACE_score, data_male$CVD)
+CochranArmitageTest(tab5)
+```
+
+```{r}
+tab6 <- table(data_male$ACE_score, data_male$HTA)
+CochranArmitageTest(tab6)
+```
+
+```{r}
+tab7 <- table(data_male$ACE_score, data_male$Obesity)
+CochranArmitageTest(tab7)
+```
+
+Sensitivity analysis
+
+m1 <- glm(HTA ~ ACE_score + age + ethnic_group,data = data_female, family = binomial(logit)
+m2 <- glm(HTA ~ ACEs2 + age + ethnic_group,data = data_female, family = binomial(logit)
+
+tab_model(m1)
+```
+
+
+
+#Graphics OR for females (we repeat same procedures)
+```{r}
+#Change to factor for the regressions
+data_female$Obesity = as.factor(data_female$Obesity)
+data_female$HTA      = as.factor(data_female$HTA)
+data_female$Diabetes = as.factor(data_female$Diabetes)
+data_female$CVD      = as.factor(data_female$CVD)
+
+data_female$ACEs2    = as.factor(data_female$ACEs2)
+data_female$ethnic_group2   = as.factor(data_female$ethnic_group2)
+data_female$aces_score   = as.factor(data_female$aces_score)
+data_female$ACE_score   = as.factor(data_female$ACE_score)
+                         
+                         
+#If we realized, we need to re-parametizer the model (putting always reference the wealthiest groups)
+data_female <- within (data_female, ACEs2 <- relevel (ACEs2, ref = '1'))
+data_female <- within (data_female, ethnic_group2 <- relevel (ethnic_group2, ref = '1'))
+data_female <- within (data_female, aces_score <- relevel (aces_score, ref = '1'))
+data_female <- within (data_female, ACE_score <- relevel (ACE_score, ref = 'ACE 0'))
+```
+
+# Specify explanatory variables of interest
+```{r}
+iv <- c("ACE_score","age","ethnic_group2")
+dv <- "Diabetes"
+
+data_female %>% or_plot(dv, iv)
+
+table2 <- data_female %>%
+finalfit(dv, iv,dependent_label_prefix = "")
+
+table2
+```
+
+
+```{r}
+# Specify explanatory variables of interest
+iv <- c("ACE_score","age", "ethnic_group2")
+dv <- "CVD"
+
+data_female %>% or_plot(dv, iv)
+
+table2 <- data_female %>%
+finalfit(dv, iv,dependent_label_prefix = "")
+
+table2
+```
+
+
+```{r}
+# Specify explanatory variables of interest
+iv <- c("ACE_score","age", "ethnic_group2")
+dv <- "HTA"
+
+data_female %>% or_plot(dv, iv)
+
+table2 <- data_female %>%
+finalfit(dv, iv,dependent_label_prefix = "")
+
+table2
+```
+
+
+```{r}
+# Specify explanatory variables of interest
+iv <- c("ACE_score","age", "ethnic_group2")
+dv <- "Obesity"
+
+data_female %>% or_plot(dv, iv)
+
+table2 <- data_female %>%
+finalfit(dv, iv,dependent_label_prefix = "")
+
+table2
+```
+
+
+
+Perform a Cochran Armitage test for trend in binomial proportions across the levels of a single variable. The null hypothesis is the hypothesis of no trend, which means that the binomial proportion is the same for all levels of the explanatory variable.
+
+```{r}
+tab1 <- table(data_female$ACE_score, data_female$Diabetes)
+CochranArmitageTest(tab1)
+```
+
+```{r}
+tab2 <- table(data_female$ACE_score, data_female$CVD)
+CochranArmitageTest(tab2)
+```
+
+```{r}
+tab3 <- table(data_female$ACE_score, data_female$HTA)
+CochranArmitageTest(tab3)
+```
+
+```{r}
+tab4 <- table(data_female$ACE_score, data_female$Obesity)
+CochranArmitageTest(tab4)
+```
+
+
+Not spliting dataframe by sex
+
+```{r}
+# Specify explanatory variables of interest all explanatory variables
+
+iv <- c("ACEs2","age", "sex2", "ethnic_group2")
+dv <- "Diabetes"
+
+pathways_final %>% or_plot(dv, iv)
+
+table3 <- pathways_final %>%
+finalfit(dv, iv, 
+           dependent_label_prefix = "")
+
+table3
+```
+
+```{r}
+# All explanatory variables of interest and four diseases
+
+iv <- c("ACEs2","age","sex2", "ethnic_group2")
+dv <- c("CVD")
+
+pathways_final %>% or_plot(dv, iv)
+
+table4 <- pathways_final %>%
+finalfit(dv, iv, 
+           dependent_label_prefix = "")
+
+table4
+```
+
+
+```{r}
+# All explanatory variables of interest and four diseases
+
+iv <- c("ACEs2","age","sex2", "ethnic_group2")
+dv <- c("Obesity")
+
+pathways_final %>% or_plot(dv, iv)
+
+table5 <- pathways_final  %>%
+finalfit(dv, iv, 
+           dependent_label_prefix = "")
+
+table5
+```
+
+
+
+
+#Individual ACEs and diseases females
+```{r}
+#Change to factor for the regressions
+data_female$emotional_abuse.x     = as.factor(data_female$emotional_abuse.x)
+data_female$neglected_food     = as.factor(data_female$neglected_food)
+data_female$household_violence     = as.factor(data_female$household_violence)
+data_female$poor_health2     = as.factor(data_female$poor_health2)
+data_female$early_infection.x       = as.factor(data_female$early_infection.x)
+data_female$childhood_migration.x   = as.factor(data_female$childhood_migration.x)
+data_female$Low_childhood_sep   = as.factor(data_female$Low_childhood_sep)
+data_female$Adult_sep   = as.factor(data_female$Adult_sep)
+
+
+#If we realized, we need to re-parametizer the model (putting always reference the wealthiest groups)
+data_female <- within (data_female, emotional_abuse.x <- relevel (emotional_abuse.x, ref = '0'))
+data_female <- within (data_female, neglected_food    <- relevel (neglected_food, ref = '0'))
+data_female <- within (data_female, household_violence <- relevel (household_violence, ref = '0'))
+data_female <- within (data_female, poor_health2 <- relevel (poor_health2, ref = '0'))
+data_female <- within (data_female, early_infection.x <- relevel (early_infection.x, ref = '0'))
+data_female <- within (data_female, childhood_migration.x <- relevel (childhood_migration.x, ref = '0'))
+
+# Specify explanatory variables of interest
+iv <- c("Adult_sep","age", "ethnic_group2")
+dv <- "HTA"
+
+data_female %>% or_plot(dv, iv)
+
+table2 <- data_female %>%
+finalfit(dv, iv,dependent_label_prefix = "")
+
+table2
+```
+
+#Individual ACEs and diseases males
+```{r}
+#Change to factor for the regressions
+data_male$Obesity      = as.factor(data_male$Obesity)
+data_male$HTA      = as.factor(data_male$HTA)
+data_male$Diabetes = as.factor(data_male$Diabetes)
+data_male$CVD      = as.factor(data_male$CVD)
+
+data_male$ethnic_group2   = as.factor(data_male$ethnic_group2)
+
+#Change to factor for the regressions
+data_male$emotional_abuse.x     = as.factor(data_male$emotional_abuse.x)
+data_male$neglected_food     = as.factor(data_male$neglected_food)
+data_male$household_violence     = as.factor(data_male$household_violence)
+data_male$poor_health2     = as.factor(data_male$poor_health2)
+data_male$early_infection.x       = as.factor(data_male$early_infection.x)
+data_male$childhood_migration.x   = as.factor(data_male$childhood_migration.x)
+data_male$Low_childhood_sep   = as.factor(data_male$Low_childhood_sep)
+data_male$Adult_sep   = as.factor(data_male$Adult_sep)
+
+
+#If we realized, we need to re-parametizer the model (putting always reference the wealthiest groups)
+data_male <- within (data_male, emotional_abuse.x <- relevel (emotional_abuse.x, ref = '0'))
+data_male <- within (data_male, neglected_food    <- relevel (neglected_food, ref = '0'))
+data_male <- within (data_male, household_violence <- relevel (household_violence, ref = '0'))
+data_male <- within (data_male, poor_health2 <- relevel (poor_health2, ref = '0'))
+data_male <- within (data_male, early_infection.x <- relevel (early_infection.x, ref = '0'))
+data_male <- within (data_male, childhood_migration.x <- relevel (childhood_migration.x, ref = '0'))
+
+# Specify explanatory variables of interest
+iv <- c("Adult_sep","age", "ethnic_group2")
+dv <- "HTA"
+
+data_male %>% or_plot(dv, iv)
+
+table2 <- data_male %>%
+finalfit(dv, iv,dependent_label_prefix = "")
+
+table2
+```
+
+
+
+Validation Logistic regression with sjPlot package
+
+
+```{r}
+m3 <- glm(
+  tot_sc_e ~ c160age + c12hour + c161sex + c172code, 
+  data = efc,
+  family = poisson(link = "log")
+)
+
+efc$neg_c_7d <- ifelse(efc$neg_c_7 < median(efc$neg_c_7, na.rm = TRUE), 0, 1)
+m4 <- glm(
+  neg_c_7d ~ c161sex + barthtot + c172code,
+  data = efc,
+  family = binomial(link = "logit")
+)
+
+tab_model(m3, m4)
+```
+
+
+```{r cars}
+
+# load package
+library(sjPlot)
+library(sjmisc)
+library(sjlabelled)
+
+
+m6 <- glm(
+  HTA ~ ACEs2 + age + ethnic_group2,
+  data = data_male,
+  family = binomial(logit)
+)
+
+m7 <- glm(
+  CVD ~ ACEs2 + age + ethnic_group2,
+  data = data_male,
+  family = binomial(logit)
+)
+
+m8 <- glm(
+  Diabetes ~ ACEs2 + age + ethnic_group2,
+  data = data_male,
+  family = binomial(logit)
+)
+
+m9 <- glm(
+  Obesity ~ ACEs2 + age + ethnic_group2,
+  data = data_male,
+  family = binomial(logit)
+)
+
+tab_model(m6, m7, m8, m9)
+```
+
+
+
+Logistic models paper2
+```{r}
+tab_model(m, 
+          show.reflvl = T, 
+          show.intercept = F, 
+          p.style = "numeric_stars")
+```
+
+
+second validation with ggstatplot package
+
+```{r cars}
+# for reproducibility
+set.seed(123)
+
+install.packages('ggstatsplot')
+
+library(ggstatsplot)
+library(lme4)
+#> Loading required package: Matrix
+
+# model object
+mod <- lm(formula = HTA ~ ACEs + age + gender + ethnic_group, data = pathways_final)
+mod1 <- lm(formula = Obesity ~ ACEs + age + sex + ethnic_group, data = pathways_final, contrasts = list(ACEs=c("Low-risk" =1))
+
+# creating a plot
+p <- ggcoefstats(mod1)
+
+# looking at the plot
+p
+
+```
+
+
+
+OD with ggstats
+
+```{r cars}
+install.packages("ggstatsplot")
+library(ggstatsplot)
+```
+
+
+
+```{r cars}
+model_obesity <- glm(
+  obesity ~  aces,
+  data = dataBA2,
+  family = binomial(logit)
+)
+
+# looking at the plot
+model_obesity
+```
+
+
+```{r cars}
+
+# for reproducibility
+set.seed(123)
+library(lme4)
+
+#> Loading required package: Matrix
+
+# model object
+mod <- lm(formula = obesity ~ aces * gender, data = dataBA2)
+
+# creating a plot
+p <- ggcoefstats(mod)
+
+# looking at the plot
+p
+```
+
+
+logistic regression with Bard - Machine learning
+
+```{r cars}
+1. Load the necessary libraries:
   
+library(glmnet)
+
+2. Load your data:
+ 
+3. Split your data into training and test sets: 
+set.seed(123)
+train_index <- sample(1:nrow(data), size = 0.8 * nrow(data))
+train_data <- data[train_index, ]
+test_data <- data[-train_index, ]
+
+
+Fit the logistic regression model:
+4. model <- glm(HTA ~ ACEs - 1, family = "binomial", data = train_data)
+
+
+5. Evaluate the model on the test set:
+test_predictions <- predict(model, newdata = test_data, type = "response")
+test_accuracy <- mean(test_predictions == test_data$HTA)
+print(test_accuracy)
+
+
+6. Interpret the results:
+
 ```
 
+
+```{r cars}
+glm(HTA ~ ACEs - 1, family = "binomial", )
+```
+
+
+###END ADJUSTED ODD RATIOS #####
