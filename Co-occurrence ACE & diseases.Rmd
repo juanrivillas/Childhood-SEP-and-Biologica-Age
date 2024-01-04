@@ -1,0 +1,184 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+dfsabe_pathways2$ACEs <- factor(dfsabe_pathways2$ACEs,
+                         levels = c("1", "2", "3"),
+                         labels = c("Moderate risk ACEs", "High-risk ACEs", "Low-risk ACEs"))
+
+Desc(dfsabe_pathways2$ACEs, useNAs=always)
+
+library(boot)
+
+# Create a bootstrap function
+boot_func <- function(data, i) {
+  # Sample the data with replacement
+  sample_data <- sample(pathways_final, replace = TRUE)
+
+  # Fit the model to the sampled data
+  mod_boot <- lm(formula = Obesity ~ ACEs + age + sex + ethnic_group, data = pathways_final)
+
+  # Return the coefficient of interest
+  return(mod_boot$coefficients["age"])
+}
+
+# Bootstrap the data 1000 times
+boot_results <- boot(data = pathways_final, statistic = boot_func, R = 1000)
+
+# Compute the 95% bootstrap confidence interval
+boot_ci <- boot.ci(boot_results, conf.level = 0.95)
+
+# Print the confidence interval
+print(boot_ci)
+
+```
+
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+Desc(dfsabe_pathways2$ACEs, useNAs=always)
+Desc(pathways_final$ACEs, useNAs=always)
+Desc(pathways_final$ethnic_group2, useNAs=always)
+Desc(pathways_final$sex2, useNAs=always)
+Desc(pathways_final$ACEs2, useNAs=always)
+
+install.packages ('tydiverse')
+
+skimr::skim(dfsabe_pathways2)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r pressure, echo=FALSE}
+
+
+# create a data frame with categorical variables of ACEs.
+pathways_final <- data.frame(
+    childhood_migration = factor(c("Yes","No")),
+    emotional_abuse.y = factor(c("Yes","No")),
+    poor_childhood_health = factor(c("Yes","No")),
+    poor_food_environment = factor(c("Yes","No")),
+    domestic_violence = factor(c("Yes","No")),
+    early_infection = factor(c("Yes","No"))
+
+
+# Prepare your data and 
+pathways_final$childhood_migration    <- as.numeric(as.character(pathways_final$childhood_migration))
+pathways_final$emotional_abuse.y      <- as.numeric(as.character(pathways_final$emotional_abuse.y))
+pathways_final$poor_childhood_health  <- as.numeric(as.character(pathways_final$poor_childhood_health))
+pathways_final$poor_food_environment  <- as.numeric(as.character(pathways_final$poor_food_environment))
+pathways_final$domestic_violence      <- as.numeric(as.character(pathways_final$domestic_violence))
+pathways_final$early_infection        <- as.numeric(as.character(pathways_final$early_infection))
+
+#Create a new category for the ACEs variables.
+pathways_final <- pathways_final %>%
+  mutate(ACE_score = case_when(
+      sum(c(childhood_migration.x, emotional_abuse.x, poor_health2, neglected_food, household_violence, early_infection.x)) == 0 ~ "ACE_0",
+      sum(c(childhood_migration.x, emotional_abuse.x, poor_health2, neglected_food, household_violence, early_infection.x)) == 1 ~ "ACE_1",
+      sum(c(childhood_migration.x, emotional_abuse.x, poor_health2, neglected_food, household_violence, early_infection.x)) == 2 ~ "ACE_2",
+      sum(c(childhood_migration.x, emotional_abuse.x, poor_health2, neglected_food, household_violence, early_infection.x)) == 3 ~ "ACE_3",
+      TRUE ~ "ACE_4_or_more"
+  ))
+
+
+# Sum the categorical variables of ACEs in the new category.
+data_sum <- pathways_final %>%
+  group_by(ACE_score) %>%
+  summarize(count = n())
+
+
+# View the results.
+head(data_sum)
+
+*******
+
+pathways_final$aces_score <- pathways_final$childhood_migration.x + pathways_final$emotional_abuse.x + pathways_final$poor_health2 + pathways_final$neglected_food + pathways_final$household_violence + pathways_final$early_infection.x
+
+
+Desc(pathways_final$aces_score)
+levels(pathways_final$aces_score)
+
+#create a vector co-morbidities
+pathways_final$aces_score <- factor(pathways_final$aces_score,
+                levels = c("0","1","2","3","4","5","6"),
+                labels = c("ACE 0","ACE 1", "ACE 2","ACE 3", "+ 4 ACE","+ 4 ACE", "+ 4 ACE"))
+
+Desc(pathways_final$aces_score)
+```
+
+install.packages("psych")
+library(psych)
+
+# Prepare your data as factors
+tetrachoric_correlation$childhood_migration    <- as.factor(as.character(tetrachoric_correlation$childhood_migration))
+tetrachoric_correlation$emotional_abuse        <- as.factor(as.character(tetrachoric_correlation$emotional_abuse))
+tetrachoric_correlation$poor_childhood_health  <- as.factor(as.character(tetrachoric_correlation$poor_childhood_health))
+tetrachoric_correlation$poor_food_environment  <- as.factor(as.character(tetrachoric_correlation$poor_food_environment))
+tetrachoric_correlation$domestic_violence      <- as.factor(as.character(tetrachoric_correlation$domestic_violence))
+tetrachoric_correlation$early_infection        <- as.factor(as.character(tetrachoric_correlation$early_infection))
+tetrachoric_correlation$Low_childhood_sep      <- as.factor(as.character(tetrachoric_correlation$Low_childhood_sep))
+
+# Calculate the tetrachoric correlations between all pairs of ACE variables.
+tetrachoric_correlations <- tetrachoric(tetrachoric_correlation)
+
+```{r}
+# Calculate the correlation coefficients between all pairs of ACE variables.
+tetrachoric_correlations <- polychoric(tetrachoric_correlation)
+
+# View the results.
+tetrachoric_correlations
+```
+
+
+```{r}
+Desc(pathways_final$aces_score)
+```
+
+
+```{r}
+p <- pathways_final %>% 
+  group_by(sex) %>% 
+  plot_frq(ACE_score) %>%
+    plot_grid()
+
+q <- pathways_final %>% 
+  group_by(sex) %>% 
+  plot_frq(ACEs) %>%
+    plot_grid()
+    
+save_plot(filename = "ace_Score_sex.jpg", fig = p, width = 30, height = 19)
+save_plot(filename = "lca_ace_sex.jpg", fig = q, width = 30, height = 19)
+
+```
+
+
+
+```{r}
+plot_model(m, show.values = TRUE, width = 0.1)+
+  ylab("Increase in salary as compared to no education")```
+
+
+```{r}
+plot_grpfrq(
+  var.cnt = pathways_final$ACEs, 
+  var.grp = pathways_final$ACE_score)
+  
+```
+
